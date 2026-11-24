@@ -48,7 +48,7 @@ def main():
     args = parser.parse_args()
 
     n_seeds = 2 if args.fast else 5
-    run_set = set(args.figs_only) if args.figs_only else {1, 2, 3, 4, 5}
+    run_set = set(args.figs_only) if args.figs_only else {1, 2, 3, 4, 5, 6}
 
     print("=" * 60)
     print("Opinion Dynamics Simulation — Universal Agent Project")
@@ -64,6 +64,7 @@ def main():
         experiment3_phase_transition,
         experiment4_adaptive_ua,
         experiment5_heterogeneous,
+        experiment6_multiple_ua,
     )
     from plotting import (
         plot_opinion_trajectories,
@@ -71,6 +72,7 @@ def main():
         plot_phase_transition_heatmap,
         plot_adaptive_ua,
         plot_heterogeneous,
+        plot_multiple_ua,
         plot_baseline_trajectories,
     )
 
@@ -211,6 +213,36 @@ def main():
     else:
         res5 = None
         df5 = None
+
+    # ------------------------------------------------------------------
+    # Experiment 6 — Multiple Universal Agents (k-UA model)
+    # ------------------------------------------------------------------
+    if 6 in run_set:
+        t0 = time.time()
+        res6 = experiment6_multiple_ua(n_seeds=n_seeds)
+        print(f"  Elapsed: {time.time()-t0:.1f}s\n")
+
+        plot_multiple_ua(res6, save_path=fig('exp6_multiple_ua.png'))
+
+        print("-- Exp 6A summary (fixed UAs, sweep k) --")
+        for k in res6['6A_params']['k_values']:
+            final_K = res6['6A_cluster_traj'][k][-1]
+            final_V = res6['6A_variance_traj'][k][-1]
+            print(f"  k={k}: final cluster count={final_K:.2f}, "
+                  f"final variance={final_V:.4f}")
+
+        print("-- Exp 6B summary (adaptive UAs, sweep beta) --")
+        for scope in res6['6B_params']['scopes']:
+            for beta in res6['6B_params']['betas']:
+                key = (scope, beta)
+                final_K = res6['6B_cluster_traj'][key][-1]
+                final_S = res6['6B_ua_spread_traj'][key][-1]
+                print(f"  scope={scope}, beta={beta}: "
+                      f"final cluster count={final_K:.2f}, "
+                      f"final UA spread={final_S:.4f}")
+        print()
+    else:
+        res6 = None
 
     # ------------------------------------------------------------------
     # Final summary

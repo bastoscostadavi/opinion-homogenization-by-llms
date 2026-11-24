@@ -513,7 +513,11 @@ class MultipleUAModel:
 
     UA update:
         'fixed'   : x_UA_j unchanged
-        'adaptive': x_UA_j(t+1) = (1-β)*x_UA_j(t) + β*(1/N)*sum_i x_i(t)
+        'adaptive': x_UA_j(t+1) = (1-β)*x_UA_j(t) + β*target_j(t)
+
+    For adaptive UAs, the adaptation target can be:
+        'global': target_j(t) = global population mean for all j
+        'local' : target_j(t) = mean of partition j
 
     Parameters
     ----------
@@ -546,6 +550,7 @@ class MultipleUAModel:
         beta: float = 0.05,
         ua_type: str = 'adaptive',
         ua_init='spread',
+        adaptation_scope: str = 'global',
         seed=None,
     ):
         self.N = N
@@ -555,6 +560,7 @@ class MultipleUAModel:
         self.beta = float(beta)
         self.ua_type = ua_type
         self.ua_init = ua_init
+        self.adaptation_scope = adaptation_scope
         self._rng = np.random.default_rng(seed)
 
         # Partition: group[j] = list of agent indices belonging to UA j
@@ -636,8 +642,13 @@ class MultipleUAModel:
 
         # --- UA update ---
         if self.ua_type == 'adaptive':
-            global_mean = float(self.x.mean())
-            self.x_UA = (1.0 - self.beta) * x_UA + self.beta * global_mean
+            if self.adaptation_scope == 'global':
+                targets = np.full(self.k, float(self.x.mean()))
+            elif self.adaptation_scope == 'local':
+                targets = np.array([float(self.x[idx].mean()) for idx in self.groups])
+            else:
+                raise ValueError("adaptation_scope must be 'global' or 'local'.")
+            self.x_UA = (1.0 - self.beta) * x_UA + self.beta * targets
         # 'fixed': x_UA unchanged
 
         self._ua_history.append(self.x_UA.copy())

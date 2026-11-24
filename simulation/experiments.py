@@ -570,13 +570,13 @@ def experiment6_multiple_ua(n_seeds: int = N_SEEDS) -> dict:
         Metric: cluster count K(t) and opinion variance Var(t) over time.
         Expected: k clusters form and persist (UAs are anchors).
 
-    Sub-experiment 6B — Adaptive UAs, sweep β:
+    Sub-experiment 6B — Adaptive UAs, global vs local adaptation:
         Fix: N=100, ε=0.1, α=0.3, k=4, T=300
         UAs initially at {0.1, 0.35, 0.65, 0.9} (spread across opinion space)
-        Sweep: β ∈ {0.001, 0.01, 0.1, 0.5}
+        Sweep: β ∈ {0.001, 0.01, 0.1, 0.5}, adaptation_scope ∈ {global, local}
         Metric: cluster count K(t) and UA spread (std of x_UA) over time.
-        Expected: small β → k clusters persist long;
-                  large β → UAs merge fast → 1 cluster.
+        Expected: global adaptation merges UAs; local adaptation preserves
+                  partition-specific equilibria.
 
     Returns
     -------
@@ -586,10 +586,10 @@ def experiment6_multiple_ua(n_seeds: int = N_SEEDS) -> dict:
         '6A_cluster_traj'      : dict {k: ndarray (T+1,)} — cluster count over time
         '6A_variance_traj'     : dict {k: ndarray (T+1,)} — variance over time
         '6A_params'            : dict of fixed parameters
-        '6B_histories'         : dict {beta: ndarray (T+1, N)}
-        '6B_ua_histories'      : dict {beta: ndarray (T+1, 4)}
-        '6B_cluster_traj'      : dict {beta: ndarray (T+1,)} — cluster count
-        '6B_ua_spread_traj'    : dict {beta: ndarray (T+1,)} — std of x_UA over time
+        '6B_histories'         : dict {(scope,beta): ndarray (T+1, N)}
+        '6B_ua_histories'      : dict {(scope,beta): ndarray (T+1, 4)}
+        '6B_cluster_traj'      : dict {(scope,beta): ndarray (T+1,)}
+        '6B_ua_spread_traj'    : dict {(scope,beta): ndarray (T+1,)}
         '6B_params'            : dict of fixed parameters
     """
     print("=== Experiment 6: Multiple Universal Agents ===")
@@ -644,12 +644,13 @@ def experiment6_multiple_ua(n_seeds: int = N_SEEDS) -> dict:
               f"final Var={results_6A_variance_traj[k][-1]:.4f}")
 
     # ------------------------------------------------------------------
-    # 6B — Adaptive UAs, sweep β
+    # 6B — Adaptive UAs, global vs local adaptation
     # ------------------------------------------------------------------
-    print("  --- 6B: Adaptive UAs, sweep beta ---")
+    print("  --- 6B: Adaptive UAs, global vs local adaptation ---")
     k4 = 4
     T_6B = 300
     betas = [0.001, 0.01, 0.1, 0.5]
+    scopes = ['global', 'local']
     # Fixed UA starting positions spread across opinion space
     ua_init_6B = np.array([0.1, 0.35, 0.65, 0.9])
 
@@ -658,37 +659,41 @@ def experiment6_multiple_ua(n_seeds: int = N_SEEDS) -> dict:
     results_6B_cluster_traj = {}
     results_6B_ua_spread_traj = {}
 
-    for beta in betas:
-        cluster_traj_acc = np.zeros(T_6B + 1)
-        ua_spread_acc = np.zeros(T_6B + 1)
-        ref_history = None
-        ref_ua_history = None
+    for scope in scopes:
+        for beta in betas:
+            cluster_traj_acc = np.zeros(T_6B + 1)
+            ua_spread_acc = np.zeros(T_6B + 1)
+            ref_history = None
+            ref_ua_history = None
 
-        for s in range(n_seeds):
-            seed = BASE_SEED + s * 1000
-            m = MultipleUAModel(
-                N=N, k=k4, epsilon=eps, alpha=alpha, beta=beta,
-                ua_type='adaptive',
-                ua_init=ua_init_6B.copy(),
-                seed=seed,
-            )
-            m.initialize()
-            hist, ua_hist = m.run(T_6B)
+            for s in range(n_seeds):
+                seed = BASE_SEED + s * 1000
+                m = MultipleUAModel(
+                    N=N, k=k4, epsilon=eps, alpha=alpha, beta=beta,
+                    ua_type='adaptive',
+                    ua_init=ua_init_6B.copy(),
+                    adaptation_scope=scope,
+                    seed=seed,
+                )
+                m.initialize()
+                hist, ua_hist = m.run(T_6B)
 
-            for t in range(T_6B + 1):
-                cluster_traj_acc[t] += count_clusters(hist[t], tol=0.05)
-                ua_spread_acc[t] += float(np.std(ua_hist[t]))
+                for t in range(T_6B + 1):
+                    cluster_traj_acc[t] += count_clusters(hist[t], tol=0.05)
+                    ua_spread_acc[t] += float(np.std(ua_hist[t]))
 
-            if s == 0:
-                ref_history = hist
-                ref_ua_history = ua_hist
+                if s == 0:
+                    ref_history = hist
+                    ref_ua_history = ua_hist
 
-        results_6B_histories[beta] = ref_history
-        results_6B_ua_histories[beta] = ref_ua_history
-        results_6B_cluster_traj[beta] = cluster_traj_acc / n_seeds
-        results_6B_ua_spread_traj[beta] = ua_spread_acc / n_seeds
-        print(f"    beta={beta}: final K={results_6B_cluster_traj[beta][-1]:.2f}, "
-              f"final UA spread={results_6B_ua_spread_traj[beta][-1]:.4f}")
+            key = (scope, beta)
+            results_6B_histories[key] = ref_history
+            results_6B_ua_histories[key] = ref_ua_history
+            results_6B_cluster_traj[key] = cluster_traj_acc / n_seeds
+            results_6B_ua_spread_traj[key] = ua_spread_acc / n_seeds
+            print(f"    scope={scope}, beta={beta}: "
+                  f"final K={results_6B_cluster_traj[key][-1]:.2f}, "
+                  f"final UA spread={results_6B_ua_spread_traj[key][-1]:.4f}")
 
     print("  Done.\n")
     return {
@@ -703,7 +708,8 @@ def experiment6_multiple_ua(n_seeds: int = N_SEEDS) -> dict:
         '6B_cluster_traj': results_6B_cluster_traj,
         '6B_ua_spread_traj': results_6B_ua_spread_traj,
         '6B_params': {'N': N, 'epsilon': eps, 'alpha': alpha, 'T': T_6B,
-                      'k': k4, 'betas': betas, 'ua_init': ua_init_6B.tolist()},
+                      'k': k4, 'betas': betas, 'scopes': scopes,
+                      'ua_init': ua_init_6B.tolist()},
     }
 
 

@@ -1,631 +1,592 @@
 %% ============================================================
-%%  Cultural Homogenization via a Universal Agent:
-%%  A Phase Transition in Opinion Dynamics
-%%  Draft for internal review
+%%  Opinion Homogenization via Large Language Models:
+%%  Adaptive Universal Agents and the alpha/beta Ratio
+%%  LXAI @ ICML 2026 workshop submission
 %% ============================================================
-\documentclass[11pt]{article}
+\documentclass{article}
 
-%% --- Packages -----------------------------------------------
-\usepackage{amsmath, amssymb, amsthm}
-\usepackage[margin=1in]{geometry}
-\usepackage{hyperref}
+% Recommended, but optional, packages for figures and better typesetting:
+\usepackage{microtype}
 \usepackage{graphicx}
 \usepackage{booktabs}
-\usepackage{natbib}
 
-%% --- Theorem-like environments ------------------------------
+% hyperref makes hyperlinks in the resulting PDF.
+\usepackage{hyperref}
+
+% Attempt to make hyperref and algorithmic work together better:
+\newcommand{\theHalgorithm}{\arabic{algorithm}}
+
+% LXAI workshop style (blind/review mode by default).
+\usepackage{lxai}
+
+% For theorems and such
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+
+%% --- Theorem-like environments (section-scoped, sharing theorem counter) ----
 \theoremstyle{plain}
-\newtheorem{proposition}{Proposition}
-\newtheorem{corollary}{Corollary}[proposition]
-
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
 \theoremstyle{definition}
-\newtheorem{definition}{Definition}
-
+\newtheorem{definition}[theorem]{Definition}
 \theoremstyle{remark}
-\newtheorem{remark}{Remark}[proposition]
+\newtheorem{remark}[theorem]{Remark}
 
-%% --- Notation shorthands ------------------------------------
+%% --- Notation shorthands ----------------------------------------------------
 \newcommand{\bx}{\mathbf{x}}
 \newcommand{\bw}{\mathbf{w}}
 \newcommand{\bz}{\mathbf{z}}
 \newcommand{\bone}{\mathbf{1}}
 \newcommand{\xUA}{x_{\mathrm{UA}}}
 \newcommand{\xbar}{\bar{x}}
+\newcommand{\mbar}{\bar{m}}
+\newcommand{\ubar}{\bar{u}}
 \newcommand{\Ni}{\mathcal{N}_i}
 \newcommand{\Var}{\mathrm{Var}}
 
-%% ============================================================
+%% The \icmltitle you define below is probably too long as a header.
+%% Therefore, a short form for the running title is supplied here:
+\icmltitlerunning{Opinion Homogenization via Large Language Models}
+
 \begin{document}
 
-\title{\textbf{Cultural Homogenization via a Universal Agent:\\
-A Phase Transition in Opinion Dynamics}}
+\twocolumn[
+\icmltitle{Opinion Homogenization via Large Language Models}
 
-\author{Author Names\\
-Affiliation\\
-\texttt{email@institution.edu}}
+\begin{icmlauthorlist}
+\icmlauthor{Anonymous Author(s)}{anon}
+\end{icmlauthorlist}
+\icmlaffiliation{anon}{Anonymous Institution}
+\icmlcorrespondingauthor{Anonymous Author}{anon.email@domain.com}
 
-\date{\today}
+\icmlkeywords{opinion dynamics, cultural homogenization, universal agent, phase transition, large language models, AI governance}
 
-\maketitle
+\vskip 0.3in
+]
+
+\printAffiliationsAndNotice{}  % for blind/review submission
 
 %% ------------------------------------------------------------
 \begin{abstract}
-Large language models (LLMs) are increasingly deployed as universal
-conversational partners, interacting with millions of users simultaneously.
-We study the collective consequences of this configuration through a formal
-opinion dynamics model in which a single \emph{Universal Agent} (UA)
-interacts with every member of a population at every time step.
-Extending the DeGroot and Hegselmann--Krause frameworks, we derive five
-analytical results: (1) geometric convergence to the UA's opinion for
-any non-zero coupling strength; (2) a discontinuous (first-order) phase
-transition at zero coupling; (3) a critical coupling threshold
-$\alpha^*(\varepsilon)\approx(1-3\varepsilon)/(1-2\varepsilon)$ above which
-bounded-confidence clusters merge into consensus; (4) a closed-form
-co-evolutionary fixed point for an adaptive UA; and (5) a stratification
-mechanism under heterogeneous coupling.
-Agent-based simulations with $N=100$ agents confirm these results,
-identifying a sharp phase transition at $\alpha^*\approx 0.01$--$0.04$
-and a stratification index of $0.27$ under bimodal coupling distributions.
-Our findings carry direct implications for AI governance: even vanishingly
-small AI influence suffices to relocate cultural consensus, and maintaining
-diversity requires keeping mean coupling below~$\alpha^*$.
+Large language models (LLMs) are increasingly deployed as universal conversational partners, interacting with millions of users at once. We study the collective consequences with an opinion dynamics model in which one or more \emph{Universal Agents} (UAs) interact with every member of a population and adapt toward it in turn.  The model extends Hegselmann--Krause bounded-confidence dynamics in three directions: the AI can adapt toward its users (with the fixed-AI case as a special limit), several AIs can serve different population partitions and adapt either globally or locally, and individual users may rely on the AI with different strengths. In simulations with $N=100$ agents, the population exhibits a sharp transition from multiple opinion clusters to consensus when AI reliance crosses a small threshold.  With multiple adaptive AIs, global adaptation drives all AIs---and the entire population they serve---to a single shared consensus, while local adaptation preserves a stable multi-cluster equilibrium with closed-form partition-specific consensus values. These results suggest that homogenization risk depends not only on model bias, but also on the rate at which an AI adapts to its users, and on whether an ecosystem of AIs adapts globally or locally.
 \end{abstract}
 
 %% ============================================================
 \section{Introduction}
 \label{sec:intro}
 
-The last several years have witnessed the rapid diffusion of large language
-models (LLMs) into everyday life. Writing assistance, search, tutoring,
-therapy, coding, and creative work now routinely involve AI systems whose
-outputs are consumed by hundreds of millions of users \citep{sharma2024}.
-This pattern differs qualitatively from any prior technological intervention
-in opinion and culture: a single system---or a small number of systems
-sharing similar training corpora and value representations---interacts
-simultaneously with a substantial fraction of an entire population, at
-every session, across every domain of discourse.
+The last several years have witnessed the rapid diffusion of large
+language models (LLMs) into everyday life. Writing assistance, search,
+tutoring, therapy, coding, and creative work now routinely involve AI
+systems whose outputs are consumed by hundreds of millions of users
+\citep{sharma2024}.  This pattern differs qualitatively from any
+prior technological intervention in opinion and culture: a single
+system---or a small number of systems sharing similar training corpora
+and value representations---interacts simultaneously with a substantial
+fraction of an entire population, at every session, across every
+domain of discourse.
 
 This configuration raises a pressing theoretical question: \emph{does
-universal AI interaction induce homogenization of opinion and culture at
-the population level?} If so, how sensitive is the degree of homogenization
-to the weight users place on AI-generated content relative to peer
-interaction? Is there a threshold beyond which diversity collapse is
-inevitable, regardless of how heterogeneous initial opinions are or how
-complex the social network is?
+universal AI interaction induce homogenization of opinion and culture
+at the population level?}  Beyond a yes/no, two follow-up questions
+matter for design and policy. First, since real LLMs are not static
+oracles but are continually retrained on user-influenced data, how does
+the \emph{rate} at which an AI adapts to its users trade off against
+the strength of its influence on them?  Second, when several different
+AI systems coexist in the same population, does that diversity persist,
+or does mutual exposure---through training corpora, shared benchmarks,
+and overlapping user bases---collapse the ecosystem to a single
+effective viewpoint?
 
-Classical opinion dynamics offers a rich toolkit for studying how
-opinions evolve through peer interaction \citep{castellano2009}, but
-existing models do not directly capture the UA configuration. Zealot models
-\citep{mobilia2003, mobilia2007} introduce agents with fixed opinions who
-resist change, but zealots interact with only a local neighborhood, not with
-everyone simultaneously. Stubborn-agent analyses \citep{acemoglu2013binary}
-show that fixed-opinion nodes preclude consensus in binary dynamics, yet
-again only a subset of agents interacts with each stubborn node at each step.
-Mass-media models \citep{crokidakis2014, chica2023} come closest to our
-setting: a single source broadcasts to the whole population. However, these
-models are typically studied only through simulation, focus on binary or
-Potts-type opinions, and do not allow the media agent itself to adapt. None
-of these frameworks provides the combination of analytic tractability,
-continuous opinions, and co-evolutionary dynamics that the LLM scenario demands.
-
-We address these gaps with the following contributions.
+Classical opinion dynamics provides tools for studying how opinions
+evolve through peer interaction \citep{castellano2009}, but the
+existing toolkit does not directly capture the LLM scenario.  Zealot
+models \citep{mobilia2003, mobilia2007} introduce fixed-opinion agents,
+but zealots only interact with local neighborhoods.  Stubborn-agent
+analyses \citep{acemoglu2013binary} preclude consensus in binary
+dynamics, again only through a subset of edges.  Mass-media models
+\citep{crokidakis2014, chica2023} come closest---a single source
+broadcasts to the entire population---but they are typically studied
+through simulation, focus on binary or Potts opinions, and do not
+allow the source itself to co-evolve with its audience.  None of
+these frameworks provides the combination of analytic tractability,
+continuous opinions, and bidirectional adaptation that the LLM
+scenario demands.
 
 \paragraph{Contributions.}
-\begin{enumerate}
-    \item \textbf{A formal Universal Agent model.} We extend the linear
-    DeGroot model and the nonlinear Hegselmann--Krause (HK) bounded-confidence
-    model with a single UA, introducing three variants: a fixed UA (B1),
-    an adaptive UA that tracks the population mean (B2), and a heterogeneous
-    coupling extension (B3) in which each agent has its own coupling
-    strength~$\alpha_i$.
-
-    \item \textbf{Five analytical results.}
-    \begin{itemize}
-        \item \emph{Proposition~1} (Convergence): For any $\alpha > 0$, the
-        B1-DeGroot system converges geometrically to the UA's opinion,
-        with rate $(1-\alpha)\lambda_2(W)$.
-        \item \emph{Proposition~2} (Discontinuous phase transition): The
-        equilibrium jumps discontinuously from $\bar{x}(0)$ to $\xUA$
-        at $\alpha = 0$, making the transition first-order.
-        \item \emph{Proposition~3} (Critical coupling): A heuristic
-        two-cluster bridging argument yields
-        $\alpha^*(\varepsilon)\approx(1-3\varepsilon)/(1-2\varepsilon)$
-        for the HK-UA system.
-        \item \emph{Proposition~4} (Adaptive UA fixed point):
-        $x^* = (\beta\xbar(0) + \alpha\xUA(0))/(\alpha+\beta)$,
-        derived from a conserved quantity in the co-evolutionary system.
-        \item \emph{Proposition~5} (Stratification): Heterogeneous
-        coupling produces a cascading convergence with individual time
-        scales $T_i^*\propto 1/\alpha_i$ and persistent multi-cluster
-        configurations.
-    \end{itemize}
-
-    \item \textbf{Simulation validation.} Five agent-based experiments
-    ($N=100$, $d=1$) confirm H1--H4: a sharp phase transition at
-    $\alpha^*\approx 0.01$--$0.04$, topology irrelevance at high~$\alpha$,
-    stratification under bimodal coupling, and accurate prediction of the
-    adaptive fixed point.
-\end{enumerate}
-
-\paragraph{Paper structure.}
-Section~\ref{sec:related} reviews the relevant opinion dynamics and AI
-influence literature.
-Section~\ref{sec:model} presents the formal model and hypotheses.
-Section~\ref{sec:analysis} derives the five propositions.
-Section~\ref{sec:simulations} describes the simulation framework and
-results.
-Section~\ref{sec:discussion} interprets implications for AI design and
-policy.
-Section~\ref{sec:conclusion} concludes with future directions.
+The paper is organized around three main results.  As a preliminary,
+we observe that in linear DeGroot dynamics the adaptive UA framework
+collapses to a standard $(N+1)$-agent DeGroot consensus---the UA is
+itself a DeGroot agent with a specific weight pattern---which yields
+the closed-form value
+$x^*=(\beta\,\mbar(0)+\alpha\,u(0))/(\alpha+\beta)$ for any
+$\alpha,\beta>0$ by the classical theorem.  We use this expression as
+an illustrative template throughout; the substantive contributions
+concern regimes in which the dynamics are not reducible to standard
+DeGroot.
+First, in Hegselmann--Krause (HK) dynamics---where peer averaging
+alone produces several persistent opinion clusters---we show that a
+common AI reference point dissolves those clusters by pulling them
+into mutual confidence range, with a critical coupling on the order
+of $10^{-3}$ in the parameter regime we test.  This is the
+qualitatively new regime: the AI does not merely accelerate something
+the population would have done anyway, it changes the asymptotic
+structure from $K>1$ clusters to a single cluster.
+Second, we extend the model to multiple adaptive UAs that each
+interact with a distinct population partition.  In that setting,
+globally adaptive UAs eventually converge to a common opinion,
+collapsing the population to a single shared consensus that weights
+each AI's initial opinion by its share-to-adaptation ratio
+$p_j/\beta_j$, while locally adaptive UAs preserve multiple
+partition-specific equilibria
+$x_j^*=(\beta_j\,\mbar_j(0)+\alpha\,u_j(0))/(\alpha+\beta_j)$.
+Third, when reliance on the AI varies across the population, heavy
+users homogenize first and may seed a cascade that pulls less-reliant
+users along through ordinary peer dynamics, producing a stratified
+convergence pattern.
+Together, these results separate three questions that are often
+conflated in discussion of LLM deployment: when AI breaks social
+bubbles, when an ecosystem of different models truly preserves
+pluralism, and how unequal AI usage stratifies the population.
 
 %% ============================================================
 \section{Related Work}
 \label{sec:related}
 
-\subsection{Classical Opinion Dynamics}
+\subsection{Opinion Dynamics and Influential Agents}
 
-The mathematical study of how opinions evolve through social interaction
-began with the linear framework of \citet{degroot1974}.
-In DeGroot's model, each agent holds a scalar belief and updates it at
-each discrete step by taking a weighted average of neighbors' beliefs,
-encoded in a row-stochastic influence matrix~$W$.
-For a strongly connected, aperiodic $W$, the system converges to a
-consensus whose value is a weighted average of initial opinions with
-weights determined by the stationary distribution of~$W$.
-This elegantly connects belief revision to Markov chain theory and
-provides closed-form convergence rates via the spectral gap of~$W$.
-\citet{friedkin1990} extended DeGroot by allowing agents to remain
-anchored to their initial opinions (``stubbornness''), producing persistent
-disagreement that more realistically mirrors empirical social influence
-processes.
+The mathematical study of opinion evolution began with
+\citet{degroot1974}, whose linear model updates beliefs as weighted
+averages encoded in a row-stochastic matrix~$W$, converging to a
+consensus determined by the stationary distribution of~$W$.
+\citet{friedkin1990} extended DeGroot with stubbornness, producing
+persistent disagreement.  Bounded-confidence
+models---\citet{deffuant2000} (pairwise, stochastic) and
+\citet{hegselmann2002} (synchronous, neighborhood averaging)---capture
+opinion clustering: large confidence bound $\varepsilon$ yields
+consensus, small $\varepsilon$ leaves agents isolated
+\citep{bernardo2024,castellano2009}.
 
-Non-linear models capturing \emph{bounded confidence}---the phenomenon
-that people update toward others only when their opinions are already
-similar---were introduced by \citet{deffuant2000} and \citet{hegselmann2002}.
-In the Deffuant--Weisbuch (DW) model, pairs of agents interact
-stochastically if their opinions fall within a confidence threshold
-$\varepsilon$; in the Hegselmann--Krause (HK) model, all agents update
-synchronously by averaging their confidence neighborhoods.
-Both models exhibit rich phase behavior: large~$\varepsilon$ yields
-consensus, intermediate~$\varepsilon$ produces multi-cluster fragmentation,
-and small~$\varepsilon$ leaves each agent isolated.
-A comprehensive review of bounded-confidence models appears in
-\citet{bernardo2024}; their place within the statistical physics of
-social dynamics is surveyed by \citet{castellano2009}.
+Alongside these peer-interaction frameworks, \citet{mobilia2003,
+mobilia2007} showed that even a small committed minority (``zealots'')
+can sustain or rapidly spread a minority opinion.
+\citet{acemoglu2013binary} established that stubborn agents preclude
+consensus in binary dynamics.  A crucial distinction separates zealots
+from our UA: zealots interact only with local neighborhoods, whereas
+the UA has \emph{direct} influence on every assigned agent at every
+step, and, in our adaptive variant, also \emph{updates} based on
+those interactions.
 
-\subsection{Zealots, Stubborn Agents, and Committed Minorities}
+\subsection{Media Models and AI-Driven Homogenization}
 
-Alongside these peer-interaction frameworks, a separate literature
-studies agents who resist opinion change. \citet{mobilia2003}
-showed that even a single zealot---an agent with a fixed opinion---breaks
-the symmetry of the voter model and biases its stationary distribution.
-\citet{mobilia2007} demonstrated that a small committed minority can
-sustain a minority opinion indefinitely and, above a critical fraction,
-rapidly convert the majority. The binary opinion dynamics literature
-\citep{acemoglu2013binary} established that stubborn agents preclude
-consensus, with the degree of persistent disagreement depending on network
-topology and the location of stubborn nodes.
-Complementing these theoretical results, \citet{centola2018} provided
-experimental evidence that roughly 25\% of a population suffices to
-overturn an established social convention, identifying a tipping point
-consistent with theoretical predictions.
-\citet{galam2002} studied inflexible minorities in local majority-rule
-meetings, showing they can systematically spread their views in
-democratic settings.
-
-A crucial distinction separates zealots from our UA: a zealot interacts
-with only its local neighborhood and does not interact with every agent
-simultaneously. Even a high-degree hub in a network reaches all agents
-only through multi-hop paths. The UA, by contrast, has \emph{direct}
-influence on every agent at every time step, which---as we show---produces
-qualitatively different equilibrium behavior.
-
-\subsection{Mass Media and Broadcast Influence}
-
-Closer to our setting are models in which a single entity broadcasts
-to the whole population. \citet{crokidakis2014} modeled mass media as
-an external field in a continuous-opinion model, finding that even weak
-media coupling significantly narrows the opinion distribution and can
-eliminate multi-cluster configurations. \citet{chica2023} proposed a
+Closer to our setting, \citet{crokidakis2014} modeled mass media as
+an external field in a continuous-opinion model, finding that even
+weak coupling significantly narrows the opinion distribution and can
+eliminate multi-cluster configurations.  \citet{chica2023} proposed a
 unified framework distinguishing individuals, media, and influencers
-operating on different time scales, explicitly accounting for the
-attention economy. These results establish that a globally connected
-agent constitutes a qualitatively distinct perturbation relative to
-high-centrality peer nodes, precisely because it acts on the entire
-population simultaneously.
+on different time scales.  Our adaptive UA model extends this line
+in two key directions: (i) we allow the UA to adapt to the population
+(parameter $\beta$), creating a co-evolutionary system not studied in
+prior media-agent models; and (ii) we derive analytical results
+beyond simulation, including a closed-form fixed point and a
+generalization to multiple co-evolving UAs.
 
-Our model extends this line of work in two key directions: (i) we allow
-the UA to adapt to the population (B2), which creates a co-evolutionary
-system not studied in prior media-agent models; and (ii) we derive
-analytical results that go beyond simulation, including exact convergence
-rates and a closed-form fixed-point formula.
-
-\subsection{AI Systems and Cultural Homogenization}
-
-Recent empirical research has begun to document AI-driven opinion
-homogenization. \citet{sharma2024} found that LLM-powered search systems
-create generative echo chambers, reinforcing existing user biases and
-amplifying information homogenization. \citet{zhang2025} showed that
-research participants using LLMs to answer open-ended survey questions
-produce markedly more homogeneous responses, raising methodological
-concerns for social science.
-
-Most directly relevant to our framing, \citet{daryani2026} characterize
-LLMs as ``homogenizing engines'' operating at speeds and scales exceeding
-all prior technologies. Because leading LLMs disproportionately represent
-WEIRD (Western, Educated, Industrialized, Rich, Democratic) value systems,
-their pervasive deployment effectively marginalizes non-Western and
-minority cultural expressions. Critically, a self-reinforcing feedback
-loop is identified: LLM-generated text enters future training corpora,
-compounding cultural drift across model generations---a dynamic our B2
-(adaptive UA) model captures formally.
-
-These empirical findings motivate but do not formally characterize the
-collective dynamics. Our paper provides the mathematical scaffolding:
-a precise model, proved propositions, and simulation validation that
-together establish \emph{when} and \emph{by how much} universal AI
-interaction induces cultural homogenization.
+Recent empirical research documents AI-driven opinion homogenization
+directly.  \citet{sharma2024} found that LLM-powered search creates
+generative echo chambers, reinforcing user biases.
+\citet{zhang2025} showed that participants using LLMs produce
+markedly more homogeneous survey responses.  \citet{daryani2026}
+characterize LLMs as ``homogenizing engines'' exceeding all prior
+technologies in speed and scale, identifying a self-reinforcing
+feedback loop---LLM-generated text enters future training corpora,
+compounding cultural drift across model generations---that our
+adaptive UA model captures formally.  Our paper provides the
+mathematical scaffolding: a precise co-evolutionary model, proved
+theorems, and simulation validation establishing \emph{when} and
+\emph{by how much} universal AI interaction induces cultural
+homogenization, and \emph{how} the ratio $\alpha/\beta$ controls the
+outcome.
 
 %% ============================================================
 \section{Model}
 \label{sec:model}
 
-\subsection{Stage A: Baseline Population (No Universal Agent)}
+We work throughout with $N$ agents indexed $i=1,\ldots,N$, each
+holding a scalar opinion $x_i(t)\in\mathbb{R}$ at discrete time
+$t=0,1,2,\ldots$ (the extension to $d>1$ is discussed in
+Section~\ref{sec:discussion}).  The population mean at time~$t$ is
+$\xbar(t)=\frac{1}{N}\sum_i x_i(t)$.  Peer interactions are encoded
+in a row-stochastic weight matrix $W=[w_{ij}]$ with $w_{ij}\geq 0$
+and $\sum_j w_{ij}=1$ for all~$i$.  In HK dynamics we also fix a
+confidence bound $\varepsilon>0$ and let
+$\Ni(t)=\{j:|x_j(t)-x_i(t)|<\varepsilon\}$.
 
-\paragraph{Agents and state space.}
-Let there be $N$ agents indexed $i = 1,\ldots,N$, each holding a scalar
-opinion $x_i(t)\in\mathbb{R}$ at discrete time $t=0,1,2,\ldots$
-(We work in $d=1$ throughout; the extension to $d>1$ is discussed in
-Section~\ref{sec:discussion}.)
-The population mean at time~$t$ is $\xbar(t) = \frac{1}{N}\sum_{i=1}^N x_i(t)$.
-Agent interactions are encoded in a row-stochastic weight matrix
-$W=[w_{ij}]\in\mathbb{R}^{N\times N}$ with $w_{ij}\geq 0$ and
-$\sum_j w_{ij}=1$ for all~$i$.
+\subsection{Baseline (No UA)}
 
-\paragraph{A1. DeGroot update.}
+\paragraph{DeGroot.}
 \begin{equation}
     x_i(t+1) = \sum_{j=1}^{N} w_{ij}\,x_j(t),
-    \qquad
-    \text{i.e.,}\quad \bx(t+1) = W\bx(t).
+    \qquad \bx(t+1) = W\bx(t).
     \label{eq:degroot}
 \end{equation}
-For a strongly connected, aperiodic $W$, $\bx(t)\to\bone\pi^\top\bx(0)$
-as $t\to\infty$, where $\pi$ is the stationary distribution of~$W$.
+For a strongly connected, aperiodic $W$,
+$\bx(t)\to\bone\pi^\top\bx(0)$ as $t\to\infty$, with $\pi$ the
+stationary distribution of~$W$.
 
-\paragraph{A2. Hegselmann--Krause (HK) bounded-confidence update.}
-Let $\varepsilon>0$ be the confidence bound and define
-$\Ni(t)=\{j:|x_j(t)-x_i(t)|<\varepsilon\}$.
+\paragraph{Hegselmann--Krause (HK).}
 \begin{equation}
     x_i(t+1) = \frac{1}{|\Ni(t)|}\sum_{j\in\Ni(t)} x_j(t).
     \label{eq:hk}
 \end{equation}
-Because $i\in\Ni(t)$ always, $|\Ni(t)|\geq 1$.
-For the uniform initial distribution on $[0,1]$, the system generically
-produces approximately $K\approx\lfloor 1/(2\varepsilon)\rfloor$ clusters
-at stationarity.
+For uniform initial conditions on $[0,1]$, HK generically produces
+approximately $K\approx\lfloor 1/(2\varepsilon)\rfloor$ clusters
+\citep{hegselmann2002,lorenz2007}.
 
-\subsection{Stage B: Universal Agent Extension}
+\subsection{Single Adaptive Universal Agent}
+\label{subsec:single-ua}
 
-We introduce a single Universal Agent (UA) with state $\xUA(t)\in\mathbb{R}$
-and a coupling parameter $\alpha\in[0,1]$ that governs the weight each
-agent allocates to the UA relative to peer interaction.
-
-\paragraph{B1. Fixed UA.}
-$\xUA(t) = \xUA$ for all~$t$. The modified update rules are:
+A single Universal Agent has state $\xUA(t)\in\mathbb{R}$ and
+interacts with every agent at every time step through a coupling
+$\alpha\in[0,1]$ that measures how strongly each user trusts the AI
+relative to their peers:
 \begin{align}
-    \text{B1-DeGroot:}&\quad
-    x_i(t+1) = (1-\alpha)\sum_{j=1}^N w_{ij}\,x_j(t) + \alpha\,\xUA,
-    \label{eq:b1degroot}\\
-    \text{B1-HK:}&\quad
-    x_i(t+1) = (1-\alpha)\cdot\frac{1}{|\Ni(t)|}\sum_{j\in\Ni(t)} x_j(t)
-               + \alpha\,\xUA.
-    \label{eq:b1hk}
+    x_i(t+1)
+    &= (1-\alpha)\sum_{j=1}^N w_{ij}\,x_j(t)
+       + \alpha\,\xUA(t),
+    \label{eq:agent_degroot_ua}\\
+    x_i(t+1)
+    &= (1-\alpha)\frac{1}{|\Ni(t)|}\sum_{j\in\Ni(t)} x_j(t)
+       + \alpha\,\xUA(t),
+    \label{eq:agent_hk_ua}
 \end{align}
-
-\paragraph{B2. Adaptive UA.}
-The UA updates as an exponential moving average of the population mean:
+for the DeGroot~\eqref{eq:agent_degroot_ua} and
+HK~\eqref{eq:agent_hk_ua} variants respectively.  The UA itself
+adapts as an exponential moving average of the population mean:
 \begin{equation}
     \xUA(t+1) = (1-\beta)\,\xUA(t) + \beta\,\xbar(t),
-    \label{eq:adaptive}
+    \label{eq:ua_update}
 \end{equation}
-with learning rate $\beta\in[0,1]$.
-At $\beta=0$ this reduces to B1; at $\beta=1$ the UA tracks the
-instantaneous population mean.
+with $\beta\in[0,1]$ controlling the AI's learning rate.  The
+\emph{fixed UA} is the special case $\beta=0$: $\xUA(t)\equiv\xUA(0)$.
 
-\paragraph{B3. Heterogeneous coupling.}
-Each agent~$i$ has its own coupling $\alpha_i$ drawn from a distribution
-$P(\alpha)$ on $[0,1]$ and held fixed:
+\paragraph{Crossed weights.}
+The asymmetric roles of $\alpha$ and $\beta$ are easy to confuse, so
+we state them once and use them throughout: $\alpha$ controls how
+strongly users move toward the AI, hence in the equilibrium formula
+it ends up weighting the \emph{AI's} initial opinion;
+$\beta$ controls how strongly the AI moves toward users, so it ends
+up weighting the \emph{population's} initial mean.  The ratio
+$\alpha/\beta$ is therefore the natural quantity to reason about:
+when it is large, the AI is a near-fixed anchor; when small, the AI
+mirrors its users.
+
+\subsection{Multiple Adaptive Universal Agents}
+\label{subsec:multi-ua}
+
+We partition the population into $k$ groups $G_1,\ldots,G_k$ of sizes
+$|G_j|=N_j$, with shares $p_j=N_j/N$.  Each agent
+$i\in G_j$ interacts only with UA~$j$:
 \begin{equation}
-    x_i(t+1) = (1-\alpha_i)\cdot[\text{peer term}] + \alpha_i\,\xUA(t).
-    \label{eq:b3}
+    x_i(t+1) = (1-\alpha)\,[\text{peer term}_i(t)]
+              + \alpha\,u_j(t),
+    \qquad i\in G_j,
+    \label{eq:multi_agent}
 \end{equation}
-High-$\alpha_i$ agents (heavy UA users) converge rapidly toward~$\xUA$,
-while low-$\alpha_i$ agents retain stronger peer-driven dynamics,
-generating cultural stratification.
+where the peer term is either the DeGroot or HK average over the
+peer neighbourhood of~$i$, and $u_j(t)$ denotes the opinion of UA~$j$.
+Each UA has its own adaptation rate~$\beta_j\in(0,1]$ and updates as
+\begin{equation}
+    u_j(t+1) = (1-\beta_j)\,u_j(t) + \beta_j\,\tau_j(t),
+    \label{eq:multi_ua}
+\end{equation}
+where $\tau_j(t)$ is the UA's adaptation \emph{target}.  We
+distinguish two settings:
+\begin{description}
+    \item[Global adaptation:] $\tau_j(t) = \xbar(t)$ for all~$j$, so
+        every AI averages the entire population.  This models AI
+        systems trained on shared user data (the dominant paradigm
+        today).
+    \item[Local adaptation:] $\tau_j(t) = \mbar_j(t)$, the mean opinion
+        of UA~$j$'s own partition.  This models per-region or
+        per-community fine-tuning, where each AI only learns from the
+        subpopulation it serves.
+\end{description}
+
+\subsection{Heterogeneous Reliance}
+\label{subsec:hetero}
+
+For a single UA we also consider the case where each agent has its own
+coupling $\alpha_i\sim P(\alpha)$ on $[0,1]$, held fixed throughout
+the simulation:
+\begin{equation}
+    x_i(t+1) = (1-\alpha_i)\,[\text{peer term}_i(t)]
+              + \alpha_i\,\xUA(t).
+    \label{eq:hetero}
+\end{equation}
+This captures empirically observed variation in AI-use intensity
+across a population.
 
 \subsection{Parameter Table}
 
 \begin{table}[h]
 \centering
-\caption{Model parameters, ranges, and default values used in simulations.}
+\caption{Model parameters and simulation defaults.}
 \label{tab:params}
-\begin{tabular}{@{}llll@{}}
+\vskip 0.15in
+\begin{center}
+\begin{small}
+\begin{tabular}{@{}lp{0.62\columnwidth}@{}}
 \toprule
-Symbol & Description & Range & Default \\
+Symbol & Description \\
 \midrule
-$N$      & Number of agents                       & $\mathbb{Z}_{>0}$      & 100 \\
-$d$      & Opinion vector dimension               & $\mathbb{Z}_{>0}$      & 1   \\
-$\varepsilon$ & Confidence bound (HK variant)     & $(0,\infty)$           & 0.3 \\
-$\alpha$ & Uniform coupling weight to UA          & $[0,1]$                & varied \\
-$\alpha_i$ & Agent-specific coupling weight (B3) & $[0,1]$, drawn from $P(\alpha)$ & --- \\
-$\beta$  & UA learning rate (B2 only)             & $[0,1]$                & 0.1 \\
-$\xUA$   & Initial (or fixed) UA opinion          & $\mathbb{R}$           & 0.8 \\
-$x_i(0)$& Initial agent opinion                  & $\mathbb{R}$, drawn from $P_0$ & $\mathcal{U}[0,1]$ \\
-$P_0$   & Initial opinion distribution            & Prob.\ dist.\ on $\mathbb{R}$ & $\mathcal{U}[0,1]$ \\
-$W$     & Peer weight matrix                      & Row-stochastic         & Complete \\
-Topology & Network structure                      & Complete/ring/small-world/scale-free & Complete \\
+$N=100$         & Number of agents \\
+$\varepsilon$   & Confidence bound (HK); varied in $\{0.1,0.15,0.2\}$\\
+$\alpha$        & Coupling weight to UA; swept in $[10^{-3},1]$ \\
+$\beta$         & UA learning rate; $\beta=0$ is fixed-UA limit \\
+$\alpha_i$      & Per-agent coupling (Section~\ref{subsec:hetero})\\
+$\xUA(0)=0.8$  & Initial UA opinion \\
+$x_i(0)$       & Agent opinions; $\mathcal{U}[0,1]$ \\
+$W$            & Peer weights; complete graph default \\
+$k$            & Number of UAs (Section~\ref{subsec:multi-ua}) \\
 \bottomrule
 \end{tabular}
+\end{small}
+\end{center}
+\vskip -0.1in
 \end{table}
 
-\subsection{Hypotheses}
-
-\begin{description}
-\item[H1 (Phase Transition -- Fixed UA).] There exists $\alpha^*\in(0,1)$,
-    depending on~$\varepsilon$ and~$P_0$, such that for $\alpha>\alpha^*$
-    the B1-HK system converges to a single cluster ($K=1$) with
-    $\xbar(\infty)=\xUA$, while for $\alpha<\alpha^*$ multiple clusters
-    persist.
-
-\item[H2 (Transition Sharpness -- Fixed vs.\ Adaptive).] The drop in
-    asymptotic opinion variance across~$\alpha^*$ is steeper under the
-    fixed UA (B1) than under the adaptive UA (B2) for any $\beta\in(0,1]$.
-
-\item[H3 (Cultural Stratification -- Heterogeneous Coupling).] Under B3
-    with a non-degenerate $P(\alpha)$, the asymptotic opinion distribution
-    exhibits more clusters than the homogeneous model with the same mean
-    coupling $\bar\alpha$.
-
-\item[H4 (Topology Irrelevance at High Coupling).] For any two topologies
-    $G_1,G_2$,
-    $\lim_{\alpha\to 1}|\Var_{G_1}(\infty,\alpha) - \Var_{G_2}(\infty,\alpha)|=0$.
-\end{description}
-
 %% ============================================================
-\section{Analytical Results}
-\label{sec:analysis}
+\section{Main Results}
+\label{sec:results}
 
-\subsection{Convergence of the Fixed-UA DeGroot System}
+We state our three main results, each as a theorem or analytical
+claim that the simulations of Section~\ref{sec:simulations}
+subsequently confirm.  We begin with a brief setup that records the
+closed-form behaviour of the adaptive UA in linear DeGroot dynamics
+and shows why this case is, technically, not new content: it reduces
+to standard DeGroot consensus on an enlarged graph.  The result is
+nevertheless useful as a template that the multi-UA local-adaptation
+analysis (R2) reuses partition by partition.
 
-\begin{proposition}[Convergence]
-\label{prop:convergence}
-For any $\alpha\in(0,1]$ and any row-stochastic, strongly connected,
-aperiodic $W$, the B1-DeGroot system \eqref{eq:b1degroot} converges
-geometrically to the unique fixed point $x_i^*=\xUA$ for all~$i$,
-regardless of initial conditions $\bx(0)$.
-The convergence rate is $(1-\alpha)\lambda_2(W)$, where $\lambda_2(W)<1$
-is the second-largest eigenvalue of~$W$.
-\end{proposition}
+\subsection*{Setup: Adaptive UA as a DeGroot agent}
+\label{subsec:setup}
 
-\begin{proof}
-Write $M=(1-\alpha)W$.  Then $\|M\|_\infty = (1-\alpha)\|W\|_\infty =
-(1-\alpha)<1$ for any $\alpha>0$, so the affine map
-$\bx\mapsto M\bx + \alpha\xUA\bone$ is a contraction on
-$(\mathbb{R}^N,\|\cdot\|_\infty)$.  By Banach's fixed-point theorem it
-has a unique fixed point $\bx^*$.  Setting $\bx^* = M\bx^*+\alpha\xUA\bone$
-gives $(I-M)\bx^*=\alpha\xUA\bone$; since $W\bone=\bone$ (row-stochastic),
-$\bx^*=\xUA\bone$ satisfies this equation.  Thus $x_i^*=\xUA$ for all~$i$.
-
-For the convergence rate, let $\mathbf{e}(t)=\bx(t)-\xUA\bone$.
-Subtracting the fixed-point equation from the update rule:
-$\mathbf{e}(t+1)=M\mathbf{e}(t)=(1-\alpha)^t W^t\mathbf{e}(0)$.
-Because $W$ is strongly connected and aperiodic, $\|W^t\mathbf{e}(0)\|_\infty
-\leq C\lambda_2(W)^t$ for some constant~$C$ (spectral decomposition).
-Hence $\|\mathbf{e}(t)\|_\infty\leq C[(1-\alpha)\lambda_2(W)]^t\|\mathbf{e}(0)\|_\infty$.
-\end{proof}
-
-\begin{remark}
-Proposition~\ref{prop:convergence} shows that larger~$\alpha$ accelerates
-convergence on two fronts: it reduces both the contraction factor
-$(1-\alpha)$ of the affine map and the effective mixing rate
-$(1-\alpha)\lambda_2(W)$.  For the complete graph ($\lambda_2(W)=0$),
-peer mixing collapses in one step and convergence is purely exponential
-in~$\alpha$.
-\end{remark}
-
-\subsection{Discontinuous Phase Transition at Zero Coupling}
-
-\begin{proposition}[Discontinuous Phase Transition]
-\label{prop:discontinuous}
-Define $c(\alpha)=\lim_{t\to\infty}x_1(t)$ (all agents share the same
-limit).  Then
+The adaptive UA update
+$\xUA(t+1)=(1-\beta)\xUA(t)+(\beta/N)\sum_i x_i(t)$
+is itself a row-stochastic weighted average: the UA places weight
+$(1-\beta)$ on itself and $\beta/N$ on each of the $N$ agents.  The
+combined $(N+1)$-agent system---the $N$ agents plus the UA---is
+therefore a standard DeGroot system with transition matrix
 \[
-    c(0) = \pi^\top\bx(0) = \xbar(0), \qquad
-    c(\alpha) = \xUA \quad \forall\,\alpha>0.
+    W' \;=\;
+    \begin{pmatrix}
+        (1-\alpha)/N\,J_N & \alpha\,\bone_N\\[2pt]
+        (\beta/N)\,\bone_N^\top & 1-\beta
+    \end{pmatrix},
 \]
-The jump $|c(0^+)-c(0)| = |\xUA - \xbar(0)|$ is generically nonzero,
-constituting a discontinuous (first-order) transition.
-\end{proposition}
+where $J_N$ is the $N\times N$ all-ones matrix.  $W'$ is row-stochastic,
+strongly connected, and aperiodic for any $\alpha\in(0,1]$,
+$\beta\in[0,1]$ with $\alpha+\beta>0$.  Its stationary distribution
+$\pi$ has $\pi_{\mathrm{UA}}=\alpha/(\alpha+\beta)$ and
+$\pi_i=\beta/[N(\alpha+\beta)]$ for $i\in[N]$ (direct computation), so
+the classical DeGroot consensus theorem gives
+\begin{equation}
+    x^* \;=\; \pi^\top \bx(0)
+        \;=\; \frac{\beta\,\xbar(0) + \alpha\,\xUA(0)}{\alpha+\beta}.
+    \label{eq:xstar}
+\end{equation}
+The aggregate $(\xbar,\xUA)$ contracts to $x^*$ at rate
+$1-\alpha-\beta$; individual disagreement modes contract at rate
+$(1-\alpha)\lambda_2(W)$ where $W$ is the peer matrix.
 
-\begin{proof}
-At $\alpha=0$ the system is standard DeGroot: $\bx(t)=W^t\bx(0)\to
-\bone\pi^\top\bx(0)$ by the classical theorem.  For the complete graph
-$\pi=\frac{1}{N}\bone$, so $c(0)=\xbar(0)$.  For any $\alpha>0$,
-Proposition~\ref{prop:convergence} gives $c(\alpha)=\xUA$.  Since
-$\pi^\top\bx(0)\neq\xUA$ for generic initial conditions, the jump is
-nonzero and independent of how small $\alpha>0$ is.
-\end{proof}
-
-\begin{remark}
-\label{rem:first_order}
-Proposition~\ref{prop:discontinuous} implies that even a vanishingly
-small AI influence fully relocates the long-run consensus: the transition
-is first-order.  There is no ``softly biased'' regime---only the rate of
-convergence (proportional to $\log(1/\varepsilon_{\mathrm{tol}})/\alpha$
-steps for tolerance $\varepsilon_{\mathrm{tol}}$) is affected by how small
-$\alpha$ is.  This is a direct consequence of DeGroot linearity: the
-fixed-point equation $(I-M)\bx^*=\alpha\xUA\bone$ admits a unique solution
-for all $\alpha>0$, with no continuity at $\alpha=0$.
+\begin{remark}[Crossed weights and the $\alpha/\beta$ ratio]
+\label{rem:ratio}
+The asymmetry in \eqref{eq:xstar} is intuitive: $\alpha$ measures how
+strongly users move toward the AI, so it weights the AI's initial
+opinion in the final consensus, and conversely for $\beta$.  Three
+regimes follow.  If $\alpha\gg\beta$ (slow AI), $x^*\to\xUA(0)$ and
+the AI anchors the consensus---the regime in which current LLMs
+operate, since retraining is slow relative to inference-time
+influence.  If $\alpha\ll\beta$ (fast AI), $x^*\to\xbar(0)$ and the
+consensus reflects the population's initial state.  Setting $\beta=0$
+recovers the fixed-UA case: $x^*=\xUA(0)$ for any $\alpha>0$, which is
+the classical stubborn-agent result of \citet{acemoglu2013binary}
+applied to a single all-to-one stubborn node.
 \end{remark}
 
-\subsection{Critical Coupling in the HK-UA System}
+This setup highlights what the linear case \emph{cannot} say.  Because
+the model reduces to standard DeGroot, the consensus value
+\eqref{eq:xstar} is just the stationary distribution of $W'$ in
+disguise, and the model produces no behaviour that the classical
+theorem does not already cover.  The three results that follow are
+all in regimes where this reduction fails: HK dynamics with the UA
+bypassing the confidence rule (R1), multiple UAs with global adaptation
+that introduces a non-DeGroot coupling between AIs (R2), and
+heterogeneous reliance, where each agent's effective weight on the AI
+is its own parameter (R3).
 
-\begin{proposition}[Critical Coupling]
-\label{prop:critical}
-Consider the B1-HK system \eqref{eq:b1hk} with $N$ agents drawn uniformly
-from $[0,1]$ and $\xUA$ near the center of the opinion space.
-There exists a critical value $\alpha^*(\varepsilon)\in(0,1)$ such that
-for $\alpha>\alpha^*$ the system converges to a single cluster
-($K=1$), while for $\alpha<\alpha^*$ multiple clusters persist.
-A two-cluster bridging argument yields the heuristic formula
+\subsection{R1: Adaptive UA in HK---Breaking Clusters}
+\label{subsec:R1}
+
+With bounded confidence and no AI, peer averaging is local: agents
+that disagree by more than $\varepsilon$ ignore each other, and the
+population settles into approximately
+$K\approx\lfloor 1/(2\varepsilon)\rfloor$ \emph{persistent} clusters
+that cannot subsequently merge.  This regime is qualitatively
+different from the linear setup of the previous subsection.  An
+agent's opinion is no longer a smooth weighted average of every other
+agent, and the system can no longer be re-expressed as DeGroot on an
+enlarged graph: the UA influences every agent regardless of opinion
+distance, while peers do not.  The result of this section is that
+this asymmetry is precisely what breaks the multi-cluster equilibrium.
+Even a vanishingly small coupling to a universally accessible AI is
+enough to pull the otherwise disconnected clusters into mutual
+confidence range and collapse them to a single consensus.
+
+\begin{proposition}[HK cluster breaking---critical coupling]
+\label{prop:R2}
+Consider the single-UA HK dynamics \eqref{eq:agent_hk_ua} with
+$\beta\in[0,1]$ small (so the UA is effectively fixed) and
+agent opinions drawn from $\mathcal{U}[0,1]$ with $\xUA$ near the
+centre of the opinion interval.  There exists a critical coupling
+$\alpha^*(\varepsilon)\in(0,1)$ such that for $\alpha>\alpha^*$ the
+system converges to a single cluster, and for $\alpha<\alpha^*$
+multiple clusters persist.  A two-cluster bridging argument yields
+the one-step sufficient condition
 \begin{equation}
-    \alpha^*(\varepsilon) \;\approx\; \frac{1-3\varepsilon}{1-2\varepsilon}.
+    \alpha^*(\varepsilon)
+    \;\le\; \frac{1-3\varepsilon}{1-2\varepsilon}.
     \label{eq:alphastar}
 \end{equation}
 \end{proposition}
 
-\begin{proof}[Proof sketch]
-Baseline HK (at $\alpha=0$) on $\mathcal{U}[0,1]$ produces
-$K\approx\lfloor 1/(2\varepsilon)\rfloor$ clusters.  The two extreme clusters
-sit near positions $\mu_L\approx\varepsilon$ and $\mu_R\approx 1-\varepsilon$,
-so their separation is $\Delta=|\mu_R-\mu_L|\approx 1-2\varepsilon$.
-Under one step of B1-HK, each cluster centroid moves to
-$(1-\alpha)\mu_{L,R}+\alpha\xUA$, reducing the inter-cluster gap to
-$(1-\alpha)\Delta$.  The clusters enter each other's confidence window
-(separation $<\varepsilon$) precisely when $(1-\alpha)\Delta<\varepsilon$,
-giving the critical coupling
-\[
-    \alpha^* = 1 - \frac{\varepsilon}{\Delta} = 1 - \frac{\varepsilon}{1-2\varepsilon}
-             = \frac{1-3\varepsilon}{1-2\varepsilon}.
-\]
-Because this argument assumes a single bridging step and ignores intra-cluster
-dynamics, the true~$\alpha^*$ may be slightly lower (cascade effects
-can merge clusters sequentially at smaller~$\alpha$).  Simulation confirms
-the qualitative behavior and the approximate magnitude.
+\begin{proof}
+See Appendix~\ref{app:proofs}.
 \end{proof}
 
-\begin{remark}
-The formula has natural limits: $\alpha^*\to 0$ as $\varepsilon\to\Delta$
-(clusters nearly within range and need minimal UA push) and
-$\alpha^*\to 1$ as $\varepsilon\to 0$ (extreme polarization requires
-near-complete UA dominance).  At $\varepsilon=0.3$, \eqref{eq:alphastar}
-gives $\alpha^*\approx 0.25$; however, at $\varepsilon=0.3$ the baseline HK
-already produces consensus ($K=1$) without the UA (since $2\varepsilon>1/2$),
-so the transition is only observable for smaller $\varepsilon$.
-For $\varepsilon=0.1$ and $\varepsilon=0.2$ the formula predicts
-$\alpha^*\approx 0.125$ and $0.167$, respectively, close to the simulated
-values of $0.01$--$0.04$ (the discrepancy reflects the cascade effects
-discussed above).
+\begin{remark}[The mechanism in terms of $\alpha/\beta$]
+\label{rem:R2_ratio}
+The bound \eqref{eq:alphastar} is conservative: it ignores cascade
+effects (Section~\ref{subsec:R4}) in which a small group of bridged
+agents pulls additional clusters into confidence range, so the
+empirical threshold is several orders of magnitude smaller (we
+measure $\alpha^*\approx 0.001$--$0.003$ for
+$\varepsilon\in\{0.1,0.15,0.2\}$).  The role of $\beta$ is to soften
+this effect: as $\beta$ grows, $\xUA(t)$ is dragged toward the
+population mean before clusters merge, the effective ``target''
+that distant agents would have to reach becomes a moving target near
+$\xbar(0)$, and the cluster-breaking power weakens.  In the language
+of Remark~\ref{rem:ratio}, a small $\alpha/\beta$ makes the UA a
+participant rather than an anchor, and HK clusters can survive.
 \end{remark}
 
-\subsection{Co-evolutionary Fixed Point of the Adaptive UA}
+\subsection{R2: Multiple Adaptive UAs---Global vs.\ Local Adaptation}
+\label{subsec:R2}
 
-\begin{proposition}[Adaptive UA Fixed Point]
-\label{prop:adaptive}
-In the B2-DeGroot system with the complete graph, the asymptotic consensus
-value is
+We turn to the multi-UA setting of Section~\ref{subsec:multi-ua}.
+The natural reduction is to track only partition means
+$m_j(t)$ and UA opinions $u_j(t)$, using the partition-local DeGroot
+update $m_j(t+1)=(1-\alpha)m_j(t)+\alpha u_j(t)$.  This is exact when
+the network has block structure (peer interaction is partition-local),
+and is asymptotically correct in HK once partitions separate by more
+than $\varepsilon$.
+
+\begin{theorem}[Multi-UA equilibria]
+\label{thm:R3}
+Suppose the partition-local reduction above holds, with $\alpha\in(0,1]$
+and $\beta_j\in(0,1]$ for every UA~$j=1,\ldots,k$.
+
+\textbf{(a) Global adaptation.}  With $\tau_j(t)=\mbar(t)=\sum_j p_j
+m_j(t)$, the system converges to a single common value
+$m_j^*=u_j^*=x^*$ for all~$j$, with
 \begin{equation}
-    x^* = \frac{\beta\,\xbar(0) + \alpha\,\xUA(0)}{\alpha+\beta}.
-    \label{eq:xstar}
+    x^* \;=\;
+    \frac{\dfrac{1}{\alpha}\,\mbar(0)
+          + \sum_{j=1}^{k}\dfrac{p_j}{\beta_j}\,u_j(0)}
+         {\dfrac{1}{\alpha}
+          + \sum_{j=1}^{k}\dfrac{p_j}{\beta_j}}.
+    \label{eq:R3_global}
 \end{equation}
-As $\alpha/\beta\to\infty$, $x^*\to\xUA(0)$; as $\alpha/\beta\to 0$,
-$x^*\to\xbar(0)$.
+In particular, with $\beta_j\equiv\beta$ and $\ubar(0)=\sum_j p_j u_j(0)$
+this collapses to the single-UA formula $x^*=(\beta\,\mbar(0)+\alpha\,\ubar(0))/(\alpha+\beta)$
+of Theorem~\ref{thm:R1}, with the average initial UA opinion
+$\ubar(0)$ replacing the single UA's initial opinion.
+
+\textbf{(b) Local adaptation.}  With $\tau_j(t)=m_j(t)$, the system
+decouples into $k$ independent two-variable systems, each of which
+converges to its own equilibrium
+\begin{equation}
+    x_j^* \;=\;
+    \frac{\beta_j\,m_j(0) + \alpha\,u_j(0)}{\alpha + \beta_j},
+    \qquad j=1,\ldots,k.
+    \label{eq:R3_local}
+\end{equation}
+If $|x_j^* - x_\ell^*|>\varepsilon$ for $j\neq\ell$, the resulting
+$k$-cluster configuration is stable under the HK confidence rule.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Part~(b) follows by applying Theorem~\ref{thm:R1} to each partition.
+For part~(a), define $Q(t)=\frac{1}{\alpha}\mbar(t)+\sum_j\frac{p_j}{\beta_j}u_j(t)$.
+A direct calculation (Appendix~\ref{app:proofs}) shows $Q(t+1)=Q(t)$;
+all $m_j(t)$ and $u_j(t)$ converge to a common limit, and equating
+$Q$ with that limit gives \eqref{eq:R3_global}.
+\end{proof}
+
+\begin{remark}[Persistence weights]
+\label{rem:persistence}
+The weights $p_j/\beta_j$ in \eqref{eq:R3_global} have a clean
+interpretation: an AI whose population share is $p_j$ and whose
+adaptation rate is $\beta_j$ contributes a ``persistence mass''
+proportional to $p_j/\beta_j$.  Slowly adapting AIs (small $\beta_j$)
+are more culturally persistent and pull the global consensus
+toward their initial position more strongly; rapidly adapting AIs
+(large $\beta_j$) are reflective and contribute little to the
+direction of consensus.  This formalizes the intuition that
+``conservative'' models---models that update infrequently---anchor
+society more than ``responsive'' ones, even when their market
+shares are equal.
+\end{remark}
+
+\subsection{R3: Heterogeneous Reliance and Stratification}
+\label{subsec:R3}
+
+\begin{proposition}[Stratification cascade]
+\label{prop:R4}
+Under the heterogeneous-reliance dynamics \eqref{eq:hetero} with
+$\alpha_i>0$ for all~$i$, a strongly connected, aperiodic peer
+network $W$, and a fixed UA ($\beta=0$), the unique long-run
+equilibrium is $x_i^*=\xUA$ for every~$i$.  Individual convergence
+times satisfy
+\begin{equation}
+    T_i^*(\alpha_i) \;\approx\; \frac{\log(|e_i(0)|/\delta)}{\alpha_i},
+    \label{eq:Ti}
+\end{equation}
+for tolerance~$\delta$, so high-$\alpha_i$ agents homogenize first
+and act as a ``vanguard'' that pulls low-$\alpha_i$ agents into the
+UA's confidence window through peer terms.  Under the HK rule,
+agents with $\alpha_i<\alpha^*(\varepsilon)$ may remain in separate
+clusters, producing a multi-cluster configuration absent under
+homogeneous coupling at the same mean $\bar\alpha$.
 \end{proposition}
 
 \begin{proof}
-On the complete graph all agents collapse to the mean after one step, so
-it suffices to track $s(t)=\xbar(t)$ and $u(t)=\xUA(t)$.
-The coupled linear system is
-\[
-    \bz(t+1) = A\bz(t), \qquad
-    A = \begin{pmatrix} 1-\alpha & \alpha \\ \beta & 1-\beta \end{pmatrix},
-    \qquad \bz=(s,u)^\top.
-\]
-The eigenvalues of~$A$ satisfy
-$\lambda^2-(2-\alpha-\beta)\lambda+(1-\alpha-\beta)=0$,
-which factors as $(\lambda-1)(\lambda-(1-\alpha-\beta))=0$.
-The eigenvalues are $\lambda_1=1$ (conserved direction) and
-$\lambda_2=1-\alpha-\beta$ (transient; stable since $\alpha,\beta\in(0,1)$).
-
-The left eigenvector of $A$ for $\lambda_1=1$ satisfies $\bw^\top A=\bw^\top$,
-giving $w_1/w_2=\beta/\alpha$ (normalized: $w_1=\beta/(\alpha+\beta)$,
-$w_2=\alpha/(\alpha+\beta)$).  The conserved quantity is
-\[
-    Q = \bw^\top\bz(t) = \frac{\beta\,s(t)+\alpha\,u(t)}{\alpha+\beta} = \text{const}.
-\]
-Evaluating at $t=0$ (before any update, $s(0)=\xbar(0)$, $u(0)=\xUA(0)$)
-gives $Q=(\beta\xbar(0)+\alpha\xUA(0))/(\alpha+\beta)$.
-Since the fixed point satisfies $s^*=u^*=x^*$, we have $Q=x^*$, yielding
-\eqref{eq:xstar}.
-The formula extends to arbitrary strongly connected aperiodic $W$ at the
-level of the population mean, since $W\bone=\bone$ guarantees the mean
-dynamics are identical to the complete-graph case.
-\end{proof}
-
-\begin{remark}
-Proposition~\ref{prop:adaptive} has a direct policy interpretation.
-In practice, LLM training cycles are slow (small effective~$\beta$)
-relative to the influence exerted at inference time (fixed $\alpha$),
-so the ratio $\alpha/\beta$ is large: the system behaves like a fixed UA,
-pulling consensus toward $\xUA(0)$ regardless of the population's initial
-position.  Only an AI system that \emph{retrains} on user feedback much
-faster than it influences users ($\beta\gg\alpha$) would approach the
-neutral $x^*\approx\xbar(0)$ outcome.
-\end{remark}
-
-\subsection{Stratification under Heterogeneous Coupling}
-
-\begin{proposition}[Stratification]
-\label{prop:stratification}
-Under B3 dynamics with heterogeneous couplings $\{\alpha_i\}$ (all positive)
-and strongly connected aperiodic $W$:
-\begin{enumerate}
-    \item The unique long-run fixed point is still $x_i^*=\xUA$ for all~$i$
-    (global contraction, since each row sum of the effective peer matrix
-    $[(1-\alpha_i)w_{ij}]$ is $1-\alpha_i<1$).
-    \item Individual convergence occurs on time scales
-    \begin{equation}
-        T_i^*(\alpha_i)\;\approx\;\frac{\log(|e_i(0)|/\delta)}{\alpha_i},
-        \label{eq:Ti}
-    \end{equation}
-    for tolerance~$\delta$.  Agents with small $\alpha_i$ take much longer
-    to converge than those with large $\alpha_i$.
-    \item A cascade mechanism accelerates convergence of low-$\alpha_i$
-    agents: as high-$\alpha_i$ agents converge to $\xUA$, they reinforce
-    the UA signal in the peer term, effectively raising the attraction
-    toward $\xUA$ for remaining peripheral agents.
-\end{enumerate}
-In the B3-HK model, agents with $\alpha_i>\alpha^*(\varepsilon)$ cross
-confidence boundaries and join the UA cluster; agents with
-$\alpha_i<\alpha^*(\varepsilon)$ may remain in separate clusters, producing
-a persistent multi-cluster configuration not observed under homogeneous
-coupling at the same mean $\bar\alpha$.
-\end{proposition}
-
-\begin{proof}[Proof sketch]
-Point~1 follows because $\sum_j (1-\alpha_i)w_{ij}=1-\alpha_i<1$ for all~$i$,
-so the effective update operator is row-sub-stochastic; combined with the
-UA injection term, a contraction argument analogous to Proposition~\ref{prop:convergence}
-applies to each row independently.  Point~2 follows from the single-agent
-error recursion $|e_i(t+1)|\leq(1-\alpha_i)|e_i(t)|$ (treating peer opinions
-as fixed at their limits), solved by $|e_i(t)|\leq(1-\alpha_i)^t|e_i(0)|$;
-setting $(1-\alpha_i)^{T_i^*}\approx\delta/|e_i(0)|$ and using
-$\log(1-\alpha_i)\approx-\alpha_i$ for small $\alpha_i$ gives \eqref{eq:Ti}.
-Point~3 is qualitative: as $\mathcal{C}(t)=\{i:|x_i(t)-\xUA|<\delta\}$ grows,
-its members appear in the peer terms of peripheral agents and augment their
-effective pull toward~$\xUA$.
+See Appendix~\ref{app:proofs}.
 \end{proof}
 
 \begin{remark}
 The time-scale disparity $T_i^*\propto 1/\alpha_i$ implies that in a
-population with bimodal $P(\alpha)$ (say, 50\% heavy users at
-$\alpha_H$ and 50\% light users at $\alpha_L\ll\alpha_H$), the heavy
-users converge $\alpha_H/\alpha_L$ times faster.  If $\alpha_H/\alpha_L=10$,
-heavy users have fully homogenized while light users retain 90\% of
-their initial deviation.  This multi-speed process creates a transient
-``vanguard'' of AI-aligned opinion that may then pull the remainder
-through peer influence---a stratification mechanism distinct from simple
-consensus.
+bimodal $P(\alpha)$ (say $50\%$ heavy users at $\alpha_H$ and $50\%$
+light users at $\alpha_L\ll\alpha_H$), heavy users converge
+$\alpha_H/\alpha_L$ times faster.  This creates a transient
+``AI-aligned vanguard''; if the vanguard is large enough, it can
+also tip the rest of the population via standard peer influence.
+The stratification result also reinforces Remark~\ref{rem:R2_ratio}:
+the cascade explains why empirical $\alpha^*$ values are orders of
+magnitude below the conservative bound \eqref{eq:alphastar}.
 \end{remark}
 
 %% ============================================================
@@ -634,282 +595,282 @@ consensus.
 
 \subsection{Experimental Setup}
 
-All simulations were implemented in Python using NumPy for array operations,
-NetworkX for network construction, and Matplotlib for visualization.
-We use $N=100$ agents, scalar opinions ($d=1$), and fixed random seeds
-for reproducibility.  Unless otherwise noted, initial opinions are drawn
-independently from $\mathcal{U}[0,1]$ and the UA opinion is $\xUA=0.8$.
-The bounded-confidence experiments use the HK synchronous update.
-Convergence is declared when $\max_i|x_i(t+1)-x_i(t)|<\delta=10^{-4}$.
+All simulations were implemented in Python using NumPy for array
+operations, NetworkX for network construction, and Matplotlib for
+visualization.  We use $N=100$ agents, scalar opinions ($d=1$), and
+fixed random seeds for reproducibility.  Unless otherwise noted,
+initial opinions are drawn independently from $\mathcal{U}[0,1]$ and
+the (single) UA opinion is $\xUA(0)=0.8$.  Convergence is declared
+when $\max_i|x_i(t+1)-x_i(t)|<\delta=10^{-4}$.
 
-\subsection{Baseline Convergence (Experiment 1)}
+We also confirm that for $\alpha>0$ the long-run variance is
+indistinguishable across complete, ring, Watts--Strogatz, and
+Barab\'asi--Albert peer topologies (variance gap $<10^{-3}$ by
+$\alpha\approx 0.15$); we therefore present the remaining results on
+the complete graph and refer the reader to the appendix for the
+topology comparison.
 
-Without the UA ($\alpha=0$), the HK model on a complete graph with
-$\varepsilon\in\{0.1,0.2,0.3\}$ confirms the $K\approx\lfloor 1/(2\varepsilon)\rfloor$
-cluster heuristic: at $\varepsilon=0.1$ the system converges to $K\approx 5$
-clusters; at $\varepsilon=0.2$, $K\approx 2$--$3$; at $\varepsilon=0.3$,
-$K=1$ (consensus without UA).  Substituting complete-graph, ring, Watts--Strogatz
-small-world, and Barab\'asi--Albert scale-free networks yields identical
-final cluster counts, confirming the known HK topology invariance for
-the synchronous update: the cluster structure is determined by the opinion
-distribution, not the network structure, in the absence of any UA.
+\subsection*{Setup check: closed-form consensus}
 
-\subsection{Phase Transition in Opinion Variance (Experiments 2--3)}
-
-We sweep $\alpha$ from 0 to 0.2 in increments of 0.005, running the
-B1-HK model to stationarity for each value and recording the asymptotic
-variance $\Var(\infty)$.
-As shown in Figure~\ref{fig:variance_alpha}, the variance drops sharply at
-$\alpha^*\approx 0.01$--$0.04$ for $\varepsilon=0.1$ and $\varepsilon=0.2$,
-confirming H1.
-For $\varepsilon=0.3$ (where baseline HK already achieves consensus),
-the curve is essentially zero for all $\alpha\geq 0$: the UA adds nothing
-qualitatively new when $\varepsilon$ is already large enough for spontaneous
-consensus, consistent with $\alpha^*\approx 0$ in this regime.
-
-The phase transition is visualized more comprehensively in
-Figure~\ref{fig:heatmap}, a heatmap of $\Var(\infty)$ in the $(\alpha,\varepsilon)$
-plane.  The bright-to-dark boundary traces the critical curve
-$\alpha^*(\varepsilon)$, which is a decreasing function of~$\varepsilon$
-as predicted by \eqref{eq:alphastar}: larger confidence bounds require
-smaller UA coupling to achieve consensus.
+As a sanity check on the closed-form value~\eqref{eq:xstar} we fix
+$\alpha=0.3$, $\xUA(0)=0.8$, $\varepsilon=0.1$ and sweep
+$\beta\in\{10^{-2},2\!\cdot\!10^{-2},5\!\cdot\!10^{-2},10^{-1},
+2\!\cdot\!10^{-1},5\!\cdot\!10^{-1},1\}$.  At each $\beta$ we run the
+adaptive UA dynamics to stationarity and compare the empirical
+consensus to~\eqref{eq:xstar}.  Figure~\ref{fig:setup} confirms
+agreement: $x^*\to\xUA(0)=0.8$ as $\beta\to 0$ (fixed-UA limit) and
+$x^*\to\xbar(0)\approx 0.5$ as $\beta\to 1$ (UA reflects the
+population).  The simulation uses HK with $\varepsilon=0.1$, but at
+$\alpha=0.3$ the dynamics collapse to a single cluster
+(Section~\ref{subsec:R1}) and the DeGroot consensus formula applies.
 
 \begin{figure}[ht]
-    \centering
-    \includegraphics[width=\linewidth]{../simulation/figures/exp2_variance_vs_alpha.png}
-    \caption{Asymptotic opinion variance $\Var(\infty)$ as a function of UA
-    coupling strength~$\alpha$ for three values of the confidence bound
-    $\varepsilon\in\{0.1, 0.2, 0.3\}$.  Each curve is the mean over 20
-    independent seeds; shaded bands show $\pm 1$ standard deviation.
-    A sharp drop (phase transition) is visible at $\alpha^*\approx 0.01$--$0.04$
-    for $\varepsilon=0.1$ and $0.2$.  For $\varepsilon=0.3$ the system
-    achieves consensus even without the UA.}
-    \label{fig:variance_alpha}
+\vskip 0.15in
+\begin{center}
+\centerline{\includegraphics[width=\columnwidth]{../simulation/figures/exp4_adaptive_ua.png}}
+\caption{\textbf{Setup.}  Final consensus value $x^*$ as a function of
+the UA learning rate $\beta$ (log scale) at fixed $\alpha=0.3$,
+$\varepsilon=0.1$, $\xUA(0)=0.8$.  Orange squares: simulation.
+Dashed black: closed-form~\eqref{eq:xstar}.  Horizontal dotted
+lines: limiting values $\xUA(0)$ ($\beta\to 0$) and $\xbar(0)$
+($\beta\to 1$).}
+\label{fig:setup}
+\end{center}
+\vskip -0.2in
+\end{figure}
+
+\subsection{R1 Validation: HK Cluster Breaking}
+
+We sweep $\alpha$ on a log grid from $10^{-3}$ to~$1$ at
+$\varepsilon\in\{0.1,0.15,0.2\}$ with $\beta=0$ (the worst case for
+cluster preservation, where the UA is purely fixed).
+Figure~\ref{fig:R2_variance} reports the normalized asymptotic
+variance $\Var(\infty)/\Var_0$.  Each curve drops sharply at the
+empirical critical coupling $\hat\alpha^*\approx 0.001$--$0.003$,
+far below the conservative upper bound
+\eqref{eq:alphastar}---empirical evidence for the cascade mechanism
+discussed in Remark~\ref{rem:R2_ratio}.  Figure~\ref{fig:R2_heatmap}
+shows the same transition as a $(\alpha,\varepsilon)$ heat map.
+
+\begin{figure}[ht]
+\vskip 0.15in
+\begin{center}
+\centerline{\includegraphics[width=\columnwidth]{../simulation/figures/exp2_variance_vs_alpha.png}}
+\caption{\textbf{R2.}  Normalized asymptotic variance vs.\ coupling
+$\alpha$ for HK with a fixed UA ($\beta=0$), $\xUA=0.8$, $N=100$.
+A sharp drop occurs at $\hat\alpha^*\approx 0.001$--$0.003$ for
+$\varepsilon\in\{0.1,0.15,0.2\}$; dashed lines mark the empirical
+$\hat\alpha^*$ per curve.}
+\label{fig:R2_variance}
+\end{center}
+\vskip -0.2in
 \end{figure}
 
 \begin{figure}[ht]
-    \centering
-    \includegraphics[width=0.85\linewidth]{../simulation/figures/exp3_phase_transition_heatmap.png}
-    \caption{Heatmap of asymptotic opinion variance in the $(\alpha,\varepsilon)$
-    plane.  Dark (low variance) regions correspond to UA-induced consensus;
-    bright (high variance) regions to multi-cluster fragmentation.
-    The boundary traces the critical curve $\alpha^*(\varepsilon)$ predicted
-    by \eqref{eq:alphastar}.}
-    \label{fig:heatmap}
+\vskip 0.15in
+\begin{center}
+\centerline{\includegraphics[width=\columnwidth]{../simulation/figures/exp3_phase_transition_heatmap.png}}
+\caption{\textbf{R2.}  Heat map of the asymptotic cluster count
+$K(\infty)$ in the $(\alpha,\varepsilon)$ plane (log~$\alpha$).
+Dark = consensus; bright = fragmented.  The boundary traces the
+empirical critical coupling $\hat\alpha^*(\varepsilon)$.}
+\label{fig:R2_heatmap}
+\end{center}
+\vskip -0.2in
 \end{figure}
 
-\subsection{Adaptive vs.\ Fixed UA (Experiment 4)}
+The role of $\beta$ in HK can be read indirectly from
+Figure~\ref{fig:R1}: as $\beta$ grows at fixed $\alpha=0.3$, the
+final consensus moves away from $\xUA(0)$ and toward $\xbar(0)$.
+A symmetric statement holds at smaller $\alpha$ near $\alpha^*$:
+increasing $\beta$ erodes the UA's anchoring power and pushes the
+threshold for cluster breaking outward.
 
-We compare the B1 and B2 variants across the same $\alpha$-sweep, holding
-$\beta=0.1$ for the adaptive case.  The adaptive UA fixed-point formula
-\eqref{eq:xstar} is validated by comparing $x^*_{\mathrm{sim}}$
-(simulated consensus value) against the analytical prediction
-$(\beta\xbar(0)+\alpha\xUA(0))/(\alpha+\beta)$.
-The maximum absolute error across all tested $(\alpha,\beta)$ pairs is
-$<10^{-5}$, confirming the formula exactly.
+\subsection{R2 Validation: Multiple UAs, Global vs.\ Local Adaptation}
 
-For large $\beta$ the UA drifts rapidly toward the population mean and
-the consensus value is close to $\xbar(0)$; for small $\beta$ (relative
-to $\alpha$) the consensus is pulled close to $\xUA(0)=0.8$
-(Figure~\ref{fig:adaptive}).  The transition sharpness for fixed versus
-adaptive UA at $\varepsilon=0.1$ is similar (H2 partially confirmed),
-though the adaptive case exhibits a slightly wider transition region.
-Further investigation is needed, as discussed in Section~\ref{sec:discussion}.
+We instantiate $k=4$ UAs, evenly spaced at
+$u_j(0)\in\{0.1,0.35,0.65,0.9\}$, each interacting with $N/k=25$
+agents under HK ($\varepsilon=0.1$, $\alpha=0.3$, $N=100$).
+Figure~\ref{fig:R3_fixed} (Panel~A) confirms that fixed UAs
+($\beta=0$) produce a permanent $K=4$ cluster configuration centred
+on the UA positions.  Figure~\ref{fig:R3_adapt} (Panel~B) is the
+central R3 plot: at $\beta=0.01$ for all four UAs, \emph{global}
+adaptation collapses the four clusters to a single consensus by
+$t\approx 160$, while \emph{local} adaptation preserves four
+clusters indefinitely, matching the partition-specific equilibria
+\eqref{eq:R3_local}.  The contrast is striking: at the same
+$\alpha,\beta$, simply changing the target of UA adaptation
+determines whether AI ecosystem diversity collapses or persists.
 
 \begin{figure}[ht]
-    \centering
-    \includegraphics[width=\linewidth]{../simulation/figures/exp4_adaptive_ua.png}
-    \caption{Asymptotic consensus value $x^*$ as a function of $\alpha/\beta$
-    for the adaptive UA (B2-DeGroot).  Solid curves are simulation results
-    for several $(\alpha,\beta)$ pairs; dashed lines show the analytical
-    prediction \eqref{eq:xstar}.  The formula is confirmed to machine
-    precision.  For $\alpha/\beta\gg 1$, $x^*\approx\xUA(0)=0.8$; for
-    $\alpha/\beta\ll 1$, $x^*\approx\xbar(0)\approx 0.5$.}
-    \label{fig:adaptive}
+\vskip 0.15in
+\begin{center}
+\centerline{\includegraphics[width=\columnwidth]{../simulation/figures/exp6_multiple_ua_A.png}}
+\caption{\textbf{R3 (A).}  Four fixed UAs at $u_j\in\{0.20,0.40,0.60,0.80\}$
+produce permanent $K=4$ clusters anchored at the UA positions
+($N=100$, $\varepsilon=0.1$, $\alpha=0.3$).}
+\label{fig:R3_fixed}
+\end{center}
+\vskip -0.2in
 \end{figure}
-
-\subsection{Heterogeneous Coupling and Stratification (Experiment 5)}
-
-We compare two coupling distributions: (i) a bimodal distribution with
-50\% of agents at $\alpha_H=0.55$ and 50\% at $\alpha_L=0.05$, and
-(ii) a uniform distribution with the same mean $\bar\alpha=0.30$.
-Under the uniform distribution, the system collapses to $K=1$ cluster
-(full consensus near $\xUA$).
-Under the bimodal distribution, the system converges to $K=3$ clusters:
-a core cluster near $\xUA$ (heavy users), a peripheral cluster retaining
-peer-driven dynamics (light users), and a transitional cluster formed by
-light users whose peer interactions are dominated by early-converging heavy
-users.
-We quantify separation using the stratification index
-$\mathcal{S}=\sigma_\alpha/\sigma_0$, where $\sigma_\alpha$ is the
-between-cluster variance under bimodal coupling and $\sigma_0$ is the
-initial population variance; we obtain $\mathcal{S}\approx 0.27$, confirming H3.
 
 \begin{figure}[ht]
-    \centering
-    \includegraphics[width=\linewidth]{../simulation/figures/exp5_heterogeneous.png}
-    \caption{Opinion distributions at stationarity under uniform (left)
-    and bimodal (right) coupling.  The bimodal $P(\alpha)$ produces three
-    distinct clusters with stratification index $\mathcal{S}\approx 0.27$,
-    while the uniform distribution collapses to $K=1$.
-    Dashed vertical lines mark cluster centroids; the UA position $\xUA=0.8$
-    is indicated by the red arrow.}
-    \label{fig:heterogeneous}
+\vskip 0.15in
+\begin{center}
+\centerline{\includegraphics[width=\columnwidth]{../simulation/figures/exp6_multiple_ua_B.png}}
+\caption{\textbf{R3 (B).}  Cluster count $K(t)$ for $k=4$ adaptive
+UAs at $\beta=0.01$.  Global adaptation (solid red) collapses
+$K\colon 4\to 1$ by $t\approx 160$; local adaptation
+(dashed blue) preserves $K=4$ indefinitely, in agreement with
+Theorem~\ref{thm:R3}(b).}
+\label{fig:R3_adapt}
+\end{center}
+\vskip -0.2in
 \end{figure}
 
-\subsection{Topology Invariance (Experiment 1, extended)}
+\subsection{R3 Validation: Heterogeneous Reliance}
 
-We verify H4 by running the B1-HK model on four topologies---complete,
-ring, Watts--Strogatz small-world ($k=6$, $p=0.1$), and
-Barab\'asi--Albert scale-free ($m=3$)---for varying $\alpha$.
-At $\alpha=0$, all four topologies yield the same cluster count (as
-noted above, HK cluster structure is topology-independent due to
-synchronous updates on uniform initial conditions).
-As $\alpha$ increases, variance curves across topologies coincide
-increasingly tightly, converging to zero simultaneously at the same
-$\alpha^*$.  By $\alpha=0.15$, the variance difference between any two
-topologies is $<10^{-3}$, confirming H4: UA influence erases the
-residual signature of peer network topology.
+Finally we verify Proposition~\ref{prop:R4} under HK with $N=100$,
+$\varepsilon=0.1$, $\xUA=0.8$.  Panel~A of Figure~\ref{fig:R4} shows
+a representative trajectory for a bimodal $P(\alpha)$ with $50\%$
+of agents at $\alpha_i=0.60$ and $50\%$ at $\alpha_i=0$: high-$\alpha$
+agents (red) snap to $\xUA$ within $t\approx 3$ steps, whereas
+low-$\alpha$ agents (blue) remain in peer clusters.  Panel~B
+compares four reliance distributions: the no-UA baseline and both
+bimodal distributions sustain $K\approx 3.4$--$3.8$ clusters, while
+a heavy-tail distribution $\mathrm{Beta}(0.5,2)$ collapses to
+$K=1$.  A skewed reliance pattern---even one whose mean coupling is
+\emph{lower} than the bimodal cases---can therefore be \emph{more}
+homogenizing than higher-mean alternatives, because its tail of
+heavy users seeds a cascade.
+
+\begin{figure}[ht]
+\vskip 0.15in
+\begin{center}
+\centerline{\includegraphics[width=\columnwidth]{../simulation/figures/exp5_heterogeneous_A.png}}
+\caption{\textbf{R4 (A).}  Cascade trajectories under bimodal
+$P(\alpha)$ ($50\%$ at $\alpha_i=0.60$, $50\%$ at $\alpha_i=0$;
+$N=50$, $\varepsilon=0.1$, $\xUA=0.8$). High-$\alpha$ agents converge
+within $t\approx 3$; low-$\alpha$ agents persist in peer clusters.}
+\label{fig:R4}
+\end{center}
+\vskip -0.2in
+\end{figure}
+
+\begin{figure}[ht]
+\vskip 0.15in
+\begin{center}
+\centerline{\includegraphics[width=\columnwidth]{../simulation/figures/exp5_heterogeneous_B.png}}
+\caption{\textbf{R4 (B).}  Final cluster count $K(\infty)$ under
+four reliance distributions ($N=100$, $\varepsilon=0.1$,
+$\xUA=0.8$): no UA, bimodal $0\%/30\%$, bimodal $0\%/60\%$, and a
+heavy-tail $\mathrm{Beta}(0.5,2)$.  The heavy tail collapses to
+$K=1$ despite a lower mean $\bar\alpha$ than either bimodal case.}
+\label{fig:R4_bar}
+\end{center}
+\vskip -0.2in
+\end{figure}
 
 %% ============================================================
 \section{Discussion}
 \label{sec:discussion}
 
-\subsection{Implications for AI Design}
+\subsection{The $\alpha/\beta$ Ratio as a Design Lever}
 
-Proposition~\ref{prop:discontinuous} (Remark~\ref{rem:first_order}) carries
-a sobering message for AI system designers: \emph{there is no truly neutral
-deployment}.  Even if users allocate only a small weight $\alpha$ to the AI's
-output, the long-run consensus is fully determined by the AI's opinion
-$\xUA$, not by the population's pre-existing distribution.
-The only modulation is the timescale of convergence (which grows as
-$1/\alpha$ for small $\alpha$), not the destination.
-This means a ``cautiously deployed'' AI---one that is careful about
-asserting positions---still anchors cultural consensus if it is used
-persistently enough.
-Designers aiming for genuine diversity preservation must do more than
-soften the AI's tone; they must consider whether the effective
-coupling $\alpha$ in realistic usage scenarios remains below $\alpha^*$.
+Across all four results the ratio $\alpha/\beta$ controls
+qualitative behaviour.  In DeGroot it determines the destination of
+consensus (R1); in HK it determines whether the UA can break stable
+clusters (R2); in the multi-UA setting under global adaptation it
+controls the speed at which AI diversity collapses, and the
+persistence weights $p_j/\beta_j$ determine which AI dominates the
+final consensus (R3); under heterogeneous reliance it governs the
+length of the cascade (R4).  Real LLMs sit firmly in the
+$\alpha\gg\beta$ regime: a single retraining cycle costs months,
+while inference-time influence is paid out across billions of
+interactions per day.  In our framework this is exactly the
+``slow-AI, anchoring'' regime, and the homogenization implications
+follow directly.
 
-\subsection{The Phase Transition as a Policy Threshold}
+\subsection{Governance Implications}
 
-Proposition~\ref{prop:critical} provides a quantitative policy lever:
-the critical coupling $\alpha^*(\varepsilon)$ marks the boundary below
-which multi-cluster diversity is maintained.
-If regulators or platform designers can estimate the distribution of
-user AI-interaction intensity (the distribution $P(\alpha)$ in a
-real population), the mean coupling $\bar\alpha$ can be compared
-against $\alpha^*$ to assess homogenization risk.
-Our results suggest that maintaining a diversity of AI systems with
-varying viewpoints and training data---effectively raising the heterogeneity
-of the ``UA landscape''---is the most robust policy intervention,
-since it prevents any single $\xUA$ from acting as the attractor.
+Two governance levers fall out of the analysis.  First, the
+empirical $\alpha^*$ is small ($10^{-3}$ in our parameter regime),
+which means any policy that aims to ``cap AI influence'' must do so
+quantitatively---the relevant quantity is the joint distribution of
+$\alpha_i$ across the user population, not the existence or absence
+of an AI ``cap.''  Second, R3 suggests that even a market of many
+nominally distinct LLMs can homogenize if their adaptation targets
+are effectively shared (e.g.\ all retrained on overlapping web-scale
+corpora): global adaptation collapses pluralism regardless of how
+many AIs are nominally in the ecosystem.  Local
+adaptation---per-region, per-community fine-tuning whose targets do
+\emph{not} pool across all users---preserves multi-cluster equilibria
+analytically.  A robust diversity policy should therefore favour
+ecosystem designs in which AIs adapt to disjoint subpopulations, not
+merely brand-distinct AIs trained on the same data.
 
-\subsection{Adaptive AI and Mitigation}
+\subsection{Stratification by Reliance}
 
-The adaptive UA formula (Proposition~\ref{prop:adaptive}) provides a
-theoretical foundation for designing AI systems that mitigate homogenization.
-The consensus value $x^*=(\beta\xbar(0)+\alpha\xUA(0))/(\alpha+\beta)$
-approaches the population mean only when $\beta\gg\alpha$---that is,
-when the AI updates its beliefs much faster than it influences users.
-In practice, LLM training cycles occur on timescales of months to years,
-while inference-time influence occurs across millions of daily interactions.
-The effective $\beta/\alpha$ ratio in current systems is therefore very small,
-meaning deployed LLMs behave as essentially fixed UAs even if nominally
-designed to incorporate user feedback.
-Meaningful mitigation would require continuous fine-tuning on real user
-feedback at a rate commensurate with the scale of influence---a formidable
-engineering and governance challenge.
-
-\subsection{Stratification and the AI-Use Vanguard}
-
-The stratification results (Proposition~\ref{prop:stratification},
-Experiment~5) suggest a dynamic that is particularly relevant to
-the current moment.
-Heavy AI users ($\alpha_i>\alpha^*$) converge to the AI's cultural
-position $\xUA$ on a time scale $\propto 1/\alpha_i$, while light
-users ($\alpha_i<\alpha^*$) initially retain their peer-driven opinions.
-This creates a transient ``AI-aligned vanguard'' among heavy users
-that then interacts with light users through ordinary peer dynamics.
-If the vanguard is large enough, it can tip the broader population via
-standard social influence mechanisms---a two-stage homogenization cascade.
-Our simulation shows $K=3$ clusters under bimodal coupling, but as the
-heavy-user cluster grows (in a dynamic version of the model where
-$P(\alpha)$ evolves over time), it could eventually absorb the other clusters.
-The stratification index $\mathcal{S}\approx 0.27$ quantifies the transient
-opinion gap between heavy and light users---a form of AI-induced cultural
-stratification by usage intensity.
+R4 identifies an additional axis: AI-induced cultural stratification
+by usage intensity.  The transient ``AI-aligned vanguard'' of heavy
+users is observable in our simulations within a few time steps, and
+the same mechanism explains why the empirical $\alpha^*$ is orders of
+magnitude smaller than the two-cluster bridging bound: once a small
+group is recruited, it acts as a peer-side bridge for the rest of the
+population, lowering the effective coupling needed to break clusters.
 
 \subsection{Limitations}
 
-Several limitations of the current model should be noted.
-First, we work exclusively in $d=1$ (scalar opinions).
-Real cultural space is high-dimensional, and the alignment of multiple
-opinion coordinates with a single UA may produce richer dynamics---including
-the possibility that the UA induces consensus in some dimensions while
-preserving diversity in others.
-Second, our agents update with fully rational bounded-confidence rules.
-More realistic agents might exhibit bounded rationality, emotional
-updating, or network-mediated trust that is not captured by the HK or
-DeGroot frameworks.
-Third, the empirical calibration of~$\alpha$ from real LLM interaction
-data remains open; without such calibration, it is unclear whether real
-populations operate above or below $\alpha^*$.
-Fourth, H2 (transition sharpness for fixed vs.\ adaptive UA) was only
-partially confirmed at $\varepsilon=0.1$, and further investigation
-across parameter regimes is needed.
+We work in one opinion dimension; multi-dimensional opinion space may
+exhibit qualitatively different alignment phenomena (e.g.\ the UA
+could induce consensus along some axes while preserving variation
+along others).  Our peer dynamics are fully rational; bounded
+rationality, motivated reasoning, and network-mediated trust are
+absent.  Empirical calibration of $\alpha$ and $\beta$ from
+real-world LLM interaction data is a major open problem and would
+allow our thresholds to be compared against observed regimes.
+Finally, R3(a) is proved in the partition-local reduction, which is
+exact for block-structured peer networks and asymptotically correct
+in HK once partitions separate; the joint dynamics with
+not-yet-separated partitions in HK are studied only numerically.
 
 %% ============================================================
 \section{Conclusion}
 \label{sec:conclusion}
 
-We have introduced and analyzed a Universal Agent (UA) model of opinion
-dynamics, motivated by the growing role of large language models as
-simultaneous interlocutors for entire populations.
-Our main finding is that the UA induces a sharp, first-order phase
-transition in collective opinion dynamics: above a critical coupling
-strength $\alpha^*(\varepsilon)$, universal AI interaction collapses
-opinion diversity to a single cluster anchored at the AI's position,
-regardless of the population's initial heterogeneity or the topology of
-the peer interaction network.
-Below $\alpha^*$, multi-cluster diversity is preserved.
+We introduced an adaptive Universal Agent model of opinion dynamics
+motivated by the deployment of LLMs as universal interlocutors, and
+analysed it through four results.  In linear DeGroot dynamics a
+single adaptive UA produces an exact closed-form consensus whose
+location is governed by the ratio $\alpha/\beta$; in HK the same UA
+breaks otherwise stable clusters once $\alpha/\beta$ is large enough
+to make the UA effectively fixed; with multiple UAs, global
+adaptation collapses pluralism to a weighted single consensus while
+local adaptation preserves $k$ partition-specific equilibria; and
+heterogeneous reliance produces a stratification cascade in which
+heavy users homogenize first and seed the collapse of the rest.
 
-Five analytical propositions ground this finding: a contraction-mapping
-convergence theorem, a proof of discontinuity at zero coupling, a
-heuristic closed-form for $\alpha^*$, an exact conserved-quantity derivation
-for the adaptive UA fixed point, and a stratification mechanism for
-heterogeneous coupling.
-Agent-based simulations with $N=100$ agents confirm all four primary
-hypotheses (H1, H3, H4 fully; H2 partially), validating the analytical
-framework.
+Throughout, $\alpha/\beta$ and the locality of AI adaptation are the
+twin design levers that determine whether deployed AI systems anchor
+opinion, reflect it, or preserve a diverse equilibrium.  Promising
+directions for future work include multi-dimensional opinion
+geometry, empirical estimation of $\alpha$ and $\beta$ from
+interaction logs, and network effects on the joint distribution of
+$\alpha_i$ across populations.
 
-The results carry direct implications for AI governance.
-The transition at $\alpha^*$ provides a quantitative criterion for
-homogenization risk; the adaptive fixed-point formula clarifies why
-current LLMs---with slow training relative to inference scale---are
-essentially fixed UAs; and the stratification mechanism identifies AI
-usage intensity as a novel axis of cultural stratification.
+\section*{Impact Statement}
 
-Several promising directions remain for future work.
-The most immediate is the study of \emph{multiple competing UAs} with
-different opinion targets: does competition between AIs restore diversity,
-or does the dominant UA still win?
-A second direction is \emph{multi-dimensional opinion dynamics}
-($d>1$), where the geometry of the UA's influence in culture space may
-produce qualitatively richer phase diagrams.
-Third, empirical calibration of $\alpha$ from LLM interaction logs---using
-pre/post opinion measurements around AI conversations---would allow
-the theoretical thresholds to be compared directly against real usage patterns.
-Finally, incorporating \emph{network effects on $P(\alpha)$}---the fact
-that AI usage rates are correlated with social network position---would
-make the stratification analysis more realistic.
-
-We hope this framework provides a rigorous foundation for the growing
-interdisciplinary conversation about AI's role in shaping collective
-opinion and culture.
+This paper analyses cultural homogenization induced by universally
+deployed AI systems.  The findings have direct societal implications:
+the closed-form consensus formula identifies the AI adaptation rate
+$\beta$ as a first-class governance variable alongside the coupling
+$\alpha$, and the multi-UA result shows that nominal model diversity
+does not preserve population-level pluralism unless adaptation
+targets are also disjoint.  We advocate for regulatory mechanisms
+that measure the joint $(\alpha,\beta)$ distribution and that
+preferentially encourage locally-adapted AI ecosystems.
 
 %% ============================================================
-\bibliographystyle{plainnat}
 \begin{thebibliography}{99}
 
 \bibitem[Acemoglu and Ozdaglar(2011)]{acemoglu2011}
@@ -1030,5 +991,109 @@ Generative AI meets open-ended survey responses: Research participant use of AI 
 \textit{Sociological Methods \& Research}.
 
 \end{thebibliography}
+
+%% ============================================================
+\clearpage
+\appendix
+\section{Proofs}
+\label{app:proofs}
+
+\subsection{Convergence rate for individual disagreement modes
+(Theorem~\ref{thm:R1}, second statement)}
+
+Write the single-UA DeGroot update in matrix form as
+$\bx(t+1)=(1-\alpha)W\bx(t)+\alpha\,\xUA(t)\bone$.  For \emph{fixed}
+$\xUA$ this is an affine map with linear part $M=(1-\alpha)W$.
+Define the error $\mathbf{e}(t)=\bx(t)-\xUA\bone$ (or, for adaptive
+$\xUA$, $\mathbf{e}(t)=\bx(t)-\xbar(t)\bone$ once aggregate
+convergence is reached).  Subtracting the fixed-point equation from
+the update gives $\mathbf{e}(t+1)=M\mathbf{e}(t)$, so
+$\mathbf{e}(t)=M^t\mathbf{e}(0)=(1-\alpha)^t W^t \mathbf{e}(0)$.
+Because $W$ is strongly connected and aperiodic,
+$\|W^t\mathbf{e}(0)\|_\infty\le C\lambda_2(W)^t\|\mathbf{e}(0)\|_\infty$
+for a constant $C$, hence
+$\|\mathbf{e}(t)\|_\infty\le C[(1-\alpha)\lambda_2(W)]^t\|\mathbf{e}(0)\|_\infty$.
+
+\subsection{Proof of Proposition~\ref{prop:R2} (HK critical coupling)}
+
+Baseline HK at $\alpha=0$ on $\mathcal{U}[0,1]$ produces
+$K\approx\lfloor 1/(2\varepsilon)\rfloor$ clusters.  Consider the
+stylized two-cluster case with centroids $\mu_L\approx\varepsilon$
+and $\mu_R\approx 1-\varepsilon$, separated by
+$\Delta=\mu_R-\mu_L\approx 1-2\varepsilon$.  Under one HK+UA step
+with $\xUA$ at the centre, each centroid moves to
+$(1-\alpha)\mu_{L,R}+\alpha\xUA$, so the inter-centroid gap shrinks
+to $(1-\alpha)\Delta$.  The clusters enter each other's confidence
+window once $(1-\alpha)\Delta<\varepsilon$, giving the conservative
+threshold
+\[
+    \alpha^*
+    \;\le\; 1 - \frac{\varepsilon}{\Delta}
+    \;=\; \frac{1-3\varepsilon}{1-2\varepsilon}.
+\]
+This is a one-step sufficient condition.  It ignores sequential
+recruitment (Proposition~\ref{prop:R4}); once a small bridge of
+agents reaches the UA, those agents act as peer-side anchors that
+further reduce the effective $\Delta$, so the finite-population
+transition is far below the bound.
+
+\subsection{Proof of Theorem~\ref{thm:R3}(a) (Global adaptation)}
+
+We verify that
+\[
+    Q(t) \;=\; \frac{1}{\alpha}\,\mbar(t)
+        + \sum_{j=1}^{k} \frac{p_j}{\beta_j}\,u_j(t)
+\]
+is invariant.  Compute:
+\begin{align*}
+    \mbar(t+1)
+    &= \sum_j p_j m_j(t+1)\\
+    &= \sum_j p_j\big[(1-\alpha)m_j(t) + \alpha u_j(t)\big]\\
+    &= (1-\alpha)\mbar(t) + \alpha\sum_j p_j u_j(t),
+\end{align*}
+so
+$\frac{1}{\alpha}\mbar(t+1)
+   = \frac{1}{\alpha}\mbar(t) - \mbar(t) + \sum_j p_j u_j(t)$.
+For the UA term, since $\tau_j=\mbar(t)$,
+\begin{align*}
+    \sum_j \frac{p_j}{\beta_j} u_j(t+1)
+    &= \sum_j \frac{p_j}{\beta_j}\Big[(1-\beta_j)u_j(t)+\beta_j\mbar(t)\Big]\\
+    &= \sum_j \frac{p_j}{\beta_j}u_j(t) - \sum_j p_j u_j(t)
+       + \mbar(t).
+\end{align*}
+Adding the two pieces, the $\sum_j p_j u_j(t)$ and $\mbar(t)$ terms
+cancel and $Q(t+1)=Q(t)$.
+
+The matrix governing $(m_1,\ldots,m_k,u_1,\ldots,u_k)$ is row-stochastic
+on its $2k$ coordinates restricted to the conserved hyperplane, with
+unit spectral radius once and contracting elsewhere (the analogue of
+the $2\times 2$ argument used in Theorem~\ref{thm:R1}, repeated
+$k$~times with coupling through $\mbar$).  Therefore all $m_j(t)$
+and $u_j(t)$ converge to a common limit $x^*$, and equating $Q$ with
+$x^*\,(\frac{1}{\alpha}+\sum_j p_j/\beta_j)$ yields
+\eqref{eq:R3_global}.
+
+Part (b) follows by applying Theorem~\ref{thm:R1} to each partition
+independently, since under local adaptation $\tau_j=m_j$ the system
+decouples across~$j$.
+
+\subsection{Proof of Proposition~\ref{prop:R4} (Stratification cascade)}
+
+For fixed $\xUA$, the system
+$x_i(t+1) = (1-\alpha_i)\sum_j w_{ij}x_j(t)+\alpha_i\xUA$
+has a unique fixed point $x_i^*=\xUA$ because the effective peer
+operator $[(1-\alpha_i)w_{ij}]$ has row sums $1-\alpha_i<1$ for every
+$i$, so the affine map is a contraction.  For the individual
+convergence rate, once peers are close to their limit the dominant
+relaxation is
+$|e_i(t+1)|\le (1-\alpha_i)|e_i(t)|$,
+giving $|e_i(t)|\le (1-\alpha_i)^t|e_i(0)|$.  Setting this to a
+tolerance $\delta$ and using $\log(1-\alpha_i)\approx -\alpha_i$ for
+small $\alpha_i$ yields
+$T_i^*(\alpha_i)\approx\log(|e_i(0)|/\delta)/\alpha_i$,
+which is \eqref{eq:Ti}.  The cascade statement is qualitative: as
+high-$\alpha_i$ agents converge to $\xUA$, they enter the peer terms
+of low-$\alpha_i$ agents, effectively raising the attraction toward
+$\xUA$ for the remainder of the population.
 
 \end{document}

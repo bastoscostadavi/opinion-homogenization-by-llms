@@ -7,6 +7,7 @@ Functions:
   plot_phase_transition_heatmap — Experiment 3: (alpha × epsilon) phase diagram
   plot_adaptive_ua              — Experiment 4: Prop 4 fixed-point validation
   plot_heterogeneous            — Experiment 5: cascade trajectories + bar chart
+  plot_multiple_ua              — Experiment 6: k-UA model (fixed + adaptive)
 
 All functions save the figure to `save_path` at 300 DPI and close it afterwards.
 """
@@ -222,12 +223,12 @@ def plot_phase_transition_heatmap(results_exp3: dict, save_path: str) -> None:
 
     # Labels
     # Zoom into the interesting region only
-    x_min_log, x_max_log = np.log10(alphas[0]), np.log10(0.012)
+    x_min_log, x_max_log = np.log10(alphas[0]), np.log10(0.006)
     ax.set_xlim(x_min_log, x_max_log)
-    ax.set_xticks(np.log10(np.array([0.001, 0.002, 0.003, 0.005, 0.01])))
-    ax.set_xticklabels([r'$10^{-3}$', r'$2\!\times\!10^{-3}$',
-                         r'$3\!\times\!10^{-3}$', r'$5\!\times\!10^{-3}$',
-                         r'$10^{-2}$'], fontsize=9)
+    ax.set_xticks(np.log10(np.array([0.001, 0.0015, 0.002, 0.003, 0.004, 0.006])))
+    ax.set_xticklabels([r'$10^{-3}$', r'$1.5\!\times\!10^{-3}$',
+                         r'$2\!\times\!10^{-3}$', r'$3\!\times\!10^{-3}$',
+                         r'$4\!\times\!10^{-3}$', r'$6\!\times\!10^{-3}$'], fontsize=9)
     ax.set_yticks(eps_centers)
     ax.set_yticklabels([f'{e:.2f}' for e in epsilons], fontsize=9)
     ax.set_xlabel(r'Coupling strength $\alpha$ (log scale)', fontsize=12)
@@ -239,7 +240,7 @@ def plot_phase_transition_heatmap(results_exp3: dict, save_path: str) -> None:
     )
 
     # Region labels
-    ax.text(np.log10(0.007), len(epsilons) - 1.0, 'Consensus',
+    ax.text(np.log10(0.004), len(epsilons) - 1.0, 'Consensus',
             color='#444444', fontsize=12, fontweight='bold',
             ha='center', va='top', zorder=12,
             bbox=dict(facecolor='white', alpha=0.5, edgecolor='none', pad=2))
@@ -471,9 +472,208 @@ def plot_heterogeneous(results_exp5: dict, save_path: str) -> None:
     plt.close(fig)
     print(f"  Saved: {save_path}")
 
+    # Save individual panels for two-column layout
+    base = save_path.replace('.png', '')
+
+    # Panel A alone
+    fig_A, ax_A2 = plt.subplots(figsize=(4.0, 3.5))
+    alpha_unique2 = np.unique(alpha_arr)
+    is_high2 = alpha_arr >= alpha_unique2.max() - 1e-6
+    for i in range(traj.shape[1]):
+        col = color_high if is_high2[i] else color_low
+        ax_A2.plot(time_axis[:min(conv_t + 6, 16)], traj[:min(conv_t + 6, 16), i],
+                   color=col, alpha=0.45, linewidth=1.0)
+    ax_A2.axhline(x_UA, color='crimson', linestyle='--', linewidth=2.0,
+                  label=rf'$x_{{\mathrm{{UA}}}}={x_UA}$', zorder=5)
+    if conv_t < T_traj:
+        ax_A2.axvline(conv_t, color='grey', linestyle=':', linewidth=1.5,
+                      label=rf'High-$\alpha$ conv. ($t\approx{conv_t}$)', zorder=4)
+    from matplotlib.lines import Line2D as _L2D
+    ax_A2.legend(handles=[
+        _L2D([0],[0], color=color_high, linewidth=2, label=rf'High-$\alpha$ ($\alpha_i=0.60$)'),
+        _L2D([0],[0], color=color_low,  linewidth=2, label=rf'Low-$\alpha$ ($\alpha_i=0$)'),
+    ] + ax_A2.get_lines()[-2:], fontsize=8, loc='lower right', ncol=1)
+    ax_A2.set_xlabel(r'Time step $t$', fontsize=11)
+    ax_A2.set_ylabel(r'Opinion $x_i(t)$', fontsize=11)
+    ax_A2.set_title(r'Cascade trajectories ($N=50$, $\varepsilon=0.1$, $x_{\mathrm{UA}}=0.8$)', fontsize=9)
+    ax_A2.set_xlim(0, min(conv_t + 5, 15, T_traj))
+    ax_A2.set_ylim(-0.05, 1.05)
+    fig_A.tight_layout()
+    fig_A.savefig(base + '_A.png', dpi=DPI, bbox_inches='tight')
+    plt.close(fig_A)
+    print(f"  Saved: {base}_A.png")
+
+    # Panel B alone
+    fig_B, ax_B2 = plt.subplots(figsize=(4.0, 3.5))
+    df_plot2 = df.set_index('distribution').reindex(dist_order).reset_index()
+    x_pos2 = np.arange(len(df_plot2))
+    ax_B2.bar(x_pos2, df_plot2['n_clusters'],
+              color=[PALETTE[i] for i in range(len(df_plot2))],
+              alpha=0.85, width=0.6, edgecolor='white')
+    for xi2, (_, row2) in enumerate(df_plot2.iterrows()):
+        ax_B2.text(xi2, row2['n_clusters'] + 0.05, f'K={row2["n_clusters"]:.1f}',
+                   ha='center', va='bottom', fontsize=9)
+    ax_B2.set_xticks(x_pos2)
+    ax_B2.set_xticklabels([dist_labels.get(d, d) for d in df_plot2['distribution']], fontsize=9)
+    ax_B2.set_ylabel(r'Final cluster count $K(\infty)$', fontsize=11)
+    ax_B2.set_title(r'Stratification by $\alpha_i$ distribution ($N=100$, $\varepsilon=0.1$)', fontsize=9)
+    ax_B2.yaxis.set_major_locator(plt.MaxNLocator(integer=True))
+    fig_B.tight_layout()
+    fig_B.savefig(base + '_B.png', dpi=DPI, bbox_inches='tight')
+    plt.close(fig_B)
+    print(f"  Saved: {base}_B.png")
+
 
 # ---------------------------------------------------------------------------
-# 6. Supplementary: baseline trajectory sample plots
+# 6. Multiple Universal Agents — Experiment 6 (Figure 5)
+# ---------------------------------------------------------------------------
+
+def plot_multiple_ua(results_exp6: dict, save_path: str) -> None:
+    """Two-panel figure for the k-UA model (Experiment 6).
+
+    Panel A — Fixed k=4 UAs: agent opinion trajectories coloured by group,
+    with UA positions as horizontal dashed lines (matching colours).
+    X-axis: time 0–50.  Y-axis: opinion.
+
+    Panel B — Adaptive k=4 UAs: cluster count K(t) over time comparing
+    global adaptation to local partition adaptation.
+
+    Parameters
+    ----------
+    results_exp6 : dict
+        Output of experiment6_multiple_ua().
+    save_path : str
+    """
+    # Group colours for Panel A (one per UA/group)
+    GROUP_COLORS = [PALETTE[0], PALETTE[1], PALETTE[2], PALETTE[3]]
+    BETA_COLORS  = [PALETTE[0], PALETTE[1], PALETTE[2], PALETTE[4]]
+
+    fig, (ax_A, ax_B) = plt.subplots(1, 2, figsize=(11.0, 4.5))
+
+    # ------------------------------------------------------------------
+    # Panel A: Fixed k=4 UAs — agent trajectories coloured by group
+    # ------------------------------------------------------------------
+    k_plot = 4
+    hist_A = results_exp6['6A_histories'][k_plot]      # (T+1, N)
+    ua_hist_A = results_exp6['6A_ua_histories'][k_plot]  # (T+1, k)
+    params_A = results_exp6['6A_params']
+
+    N = hist_A.shape[1]
+    T_show_A = min(50, hist_A.shape[0] - 1)
+    time_A = np.arange(T_show_A + 1)
+
+    # Reconstruct group partition (same logic as MultipleUAModel)
+    groups_A = []
+    base = N // k_plot
+    rem = N % k_plot
+    start = 0
+    for j in range(k_plot):
+        size = base + (1 if j < rem else 0)
+        groups_A.append(np.arange(start, start + size))
+        start += size
+
+    for j, grp in enumerate(groups_A):
+        col = GROUP_COLORS[j]
+        for i in grp:
+            ax_A.plot(time_A, hist_A[:T_show_A + 1, i],
+                      color=col, alpha=0.30, linewidth=0.8)
+        # UA position (constant for fixed UAs)
+        ua_val = float(ua_hist_A[0, j])
+        ax_A.axhline(ua_val, color=col, linestyle='--', linewidth=2.0,
+                     label=rf'$x_{{\mathrm{{UA}}_{j+1}}}={ua_val:.2f}$',
+                     zorder=5)
+
+    ax_A.set_xlabel(r'Time step $t$', fontsize=11)
+    ax_A.set_ylabel(r'Opinion $x_i(t)$', fontsize=11)
+    ax_A.set_xlim(0, T_show_A)
+    ax_A.set_ylim(-0.05, 1.05)
+    ax_A.set_title(r'(A) Fixed $k=4$ UAs $\to$ permanent clusters',
+                   fontsize=10, pad=6)
+    ax_A.legend(fontsize=8, loc='center right', ncol=2)
+
+    # ------------------------------------------------------------------
+    # Panel B: Adaptive k=4 UAs — global vs local adaptation
+    # ------------------------------------------------------------------
+    betas = results_exp6['6B_params']['betas']
+    T_6B = results_exp6['6B_params']['T']
+    time_B = np.arange(T_6B + 1)
+    beta_plot = 0.01 if 0.01 in betas else betas[0]
+
+    for scope, linestyle, col in [('global', '-', PALETTE[3]), ('local', '--', PALETTE[0])]:
+        key = (scope, beta_plot)
+        clust_traj = results_exp6['6B_cluster_traj'][key]
+        ax_B.plot(time_B, clust_traj, color=col, linestyle=linestyle, linewidth=2.2,
+                  label=rf'{scope} adaptation, $\beta={beta_plot}$')
+
+    # Reference line at K=1 (full consensus)
+    ax_B.axhline(1, color='grey', linestyle=':', linewidth=1.0, alpha=0.6)
+    ax_B.set_xlabel(r'Time step $t$', fontsize=11)
+    ax_B.set_ylabel(r'Cluster count $K(t)$', fontsize=11)
+    ax_B.set_xlim(0, T_6B)
+    ax_B.set_ylim(0, 5.5)
+    ax_B.yaxis.set_major_locator(plt.MaxNLocator(integer=True))
+    ax_B.set_title(
+        r'(B) Adaptive $k=4$ UAs: global vs. local learning',
+        fontsize=10, pad=6
+    )
+    ax_B.legend(fontsize=9, loc='upper right')
+
+    fig.suptitle(
+        r'Multiple Universal Agents ($k=4$, $N=100$, $\varepsilon=0.1$, $\alpha=0.3$)',
+        fontsize=11, y=1.01
+    )
+    fig.tight_layout()
+    fig.savefig(save_path, dpi=DPI, bbox_inches='tight')
+    plt.close(fig)
+    print(f"  Saved: {save_path}")
+
+    # Save individual panels for two-column layout
+    base = save_path.replace('.png', '')
+
+    # Panel A alone
+    fig_A, ax_A2 = plt.subplots(figsize=(4.0, 3.5))
+    for j, grp in enumerate(groups_A):
+        col = GROUP_COLORS[j]
+        for i in grp:
+            ax_A2.plot(time_A, hist_A[:T_show_A + 1, i],
+                       color=col, alpha=0.30, linewidth=0.8)
+        ua_val = float(ua_hist_A[0, j])
+        ax_A2.axhline(ua_val, color=col, linestyle='--', linewidth=2.0,
+                      label=rf'$x_{{\mathrm{{UA}}_{j+1}}}={ua_val:.2f}$', zorder=5)
+    ax_A2.set_xlabel(r'Time step $t$', fontsize=11)
+    ax_A2.set_ylabel(r'Opinion $x_i(t)$', fontsize=11)
+    ax_A2.set_xlim(0, T_show_A)
+    ax_A2.set_ylim(-0.05, 1.05)
+    ax_A2.set_title(r'Fixed $k=4$ UAs $\to$ permanent clusters', fontsize=9)
+    ax_A2.legend(fontsize=8, loc='center right', ncol=2)
+    fig_A.tight_layout()
+    fig_A.savefig(base + '_A.png', dpi=DPI, bbox_inches='tight')
+    plt.close(fig_A)
+    print(f"  Saved: {base}_A.png")
+
+    # Panel B alone
+    fig_B, ax_B2 = plt.subplots(figsize=(4.0, 3.5))
+    for scope, linestyle, col in [('global', '-', PALETTE[3]), ('local', '--', PALETTE[0])]:
+        clust_traj = results_exp6['6B_cluster_traj'][(scope, beta_plot)]
+        ax_B2.plot(np.arange(T_6B + 1), clust_traj,
+                   color=col, linestyle=linestyle, linewidth=2.2,
+                   label=rf'{scope}, $\beta={beta_plot}$')
+    ax_B2.axhline(1, color='grey', linestyle=':', linewidth=1.0, alpha=0.6)
+    ax_B2.set_xlabel(r'Time step $t$', fontsize=11)
+    ax_B2.set_ylabel(r'Cluster count $K(t)$', fontsize=11)
+    ax_B2.set_xlim(0, T_6B)
+    ax_B2.set_ylim(0, 5.5)
+    ax_B2.yaxis.set_major_locator(plt.MaxNLocator(integer=True))
+    ax_B2.set_title(r'Adaptive $k=4$ UAs: global vs. local learning', fontsize=9)
+    ax_B2.legend(fontsize=9, loc='upper right')
+    fig_B.tight_layout()
+    fig_B.savefig(base + '_B.png', dpi=DPI, bbox_inches='tight')
+    plt.close(fig_B)
+    print(f"  Saved: {base}_B.png")
+
+
+# ---------------------------------------------------------------------------
+# 7. Supplementary: baseline trajectory sample plots
 # ---------------------------------------------------------------------------
 
 def plot_baseline_trajectories(save_dir: str) -> None:
